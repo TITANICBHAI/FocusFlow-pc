@@ -1,7 +1,15 @@
 import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { initDatabase, getAllTasks, insertTask, updateTask, deleteTask, getSettings, saveSettings, startFocusSession, endFocusSession, getActiveFocusSession, getTodayFocusMinutes, getStreak, getBestStreak, getAllTimeFocusMinutes, getAllTimeFocusSessions, getRecentDayCompletions, backfillDayCompletions, recordDayCompletion, getTodayOverrideCount, logFocusOverride, getTasksInDateRange, getRecentUnresolvedTasks } from './database'
+import {
+  initDatabase, getAllTasks, insertTask, updateTask, deleteTask,
+  getSettings, saveSettings, startFocusSession, endFocusSession,
+  getActiveFocusSession, getTodayFocusMinutes, getStreak, getBestStreak,
+  getAllTimeFocusMinutes, getAllTimeFocusSessions, getRecentDayCompletions,
+  backfillDayCompletions, recordDayCompletion, getTodayOverrideCount,
+  logFocusOverride, getTasksInDateRange, getRecentUnresolvedTasks,
+  getNoteForDate, saveNote, getRecentNoteDates
+} from './database'
 import { readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 
@@ -68,8 +76,9 @@ function createTray(): void {
     { label: 'Open FocusFlow', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { type: 'separator' },
     { label: 'Today (Ctrl+Shift+1)', click: () => { showAndNavigate('today') } },
-    { label: 'Focus (Ctrl+Shift+2)', click: () => { showAndNavigate('focus') } },
-    { label: 'Stats (Ctrl+Shift+3)', click: () => { showAndNavigate('stats') } },
+    { label: 'Week (Ctrl+Shift+2)', click: () => { showAndNavigate('week') } },
+    { label: 'Focus (Ctrl+Shift+3)', click: () => { showAndNavigate('focus') } },
+    { label: 'Stats (Ctrl+Shift+4)', click: () => { showAndNavigate('stats') } },
     { type: 'separator' },
     { label: 'Quit FocusFlow', click: () => { app.isQuiting = true; app.quit() } }
   ])
@@ -92,9 +101,9 @@ function registerGlobalShortcuts(): void {
   })
 
   globalShortcut.register('CommandOrControl+Shift+1', () => showAndNavigate('today'))
-  globalShortcut.register('CommandOrControl+Shift+2', () => showAndNavigate('focus'))
-  globalShortcut.register('CommandOrControl+Shift+3', () => showAndNavigate('stats'))
-  globalShortcut.register('CommandOrControl+Shift+4', () => showAndNavigate('settings'))
+  globalShortcut.register('CommandOrControl+Shift+2', () => showAndNavigate('week'))
+  globalShortcut.register('CommandOrControl+Shift+3', () => showAndNavigate('focus'))
+  globalShortcut.register('CommandOrControl+Shift+4', () => showAndNavigate('stats'))
 }
 
 app.whenReady().then(() => {
@@ -153,6 +162,11 @@ ipcMain.handle('stats:getAllTimeSessions', () => getAllTimeFocusSessions())
 ipcMain.handle('stats:getRecentDayCompletions', (_, days: number) => getRecentDayCompletions(days))
 ipcMain.handle('stats:recordDayCompletion', (_, completed: number, total: number) => { recordDayCompletion(completed, total); return true })
 ipcMain.handle('stats:getTodayOverrides', () => getTodayOverrideCount())
+
+// ── Notes ───────────────────────────────────────────────────────────────────
+ipcMain.handle('notes:get', (_, date: string) => getNoteForDate(date))
+ipcMain.handle('notes:save', (_, date: string, content: string) => { saveNote(date, content); return true })
+ipcMain.handle('notes:getRecentDates', (_, days: number) => getRecentNoteDates(days))
 
 ipcMain.handle('app:getVersion', () => app.getVersion())
 ipcMain.handle('app:showNotification', (_, title: string, body: string, urgency?: 'normal' | 'critical') => {

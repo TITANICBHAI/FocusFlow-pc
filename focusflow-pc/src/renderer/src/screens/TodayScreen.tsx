@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { formatTime, isAwaitingDecision } from '../services/taskService'
 import { TASK_COLORS } from '../styles/theme'
 import type { Task } from '../data/types'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active'
 
 interface Props { navigate: (p: Page) => void }
 
@@ -15,6 +15,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 const STATUS_ICON: Record<string, string> = {
   scheduled: '⏳', active: '▶️', completed: '✅', skipped: '⏭', overdue: '⚠️'
 }
+type FilterStatus = 'all' | 'active' | 'scheduled' | 'completed' | 'skipped'
 
 function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: {
   task: Task
@@ -35,17 +36,14 @@ function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: 
       'border-gray-200 dark:border-gray-700'
     }`}>
       <div className="flex items-start gap-3 p-4">
-        {/* Color strip */}
         <div className="w-1 self-stretch rounded-full mt-0.5" style={{ backgroundColor: task.color }} />
-
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm">{STATUS_ICON[task.status] ?? '📌'}</span>
             <span className={`text-sm font-bold truncate ${task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}`}>
               {task.title}
             </span>
-            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: PRIORITY_COLOR[task.priority] + '20', color: PRIORITY_COLOR[task.priority] }}>
+            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLOR[task.priority] + '20', color: PRIORITY_COLOR[task.priority] }}>
               {task.priority}
             </span>
           </div>
@@ -63,14 +61,11 @@ function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: 
             <div className="mt-2 text-xs font-semibold text-orange-500">⏰ Time's up — pick an action below</div>
           )}
         </div>
-
-        {/* Edit button */}
         <button onClick={() => onEdit(task)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
           ✏️
         </button>
       </div>
 
-      {/* Action row */}
       {task.status !== 'completed' && task.status !== 'skipped' && (
         <div className="flex gap-1 px-4 pb-3">
           <button onClick={() => onComplete(task.id)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors">✓ Done</button>
@@ -85,20 +80,35 @@ function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: 
   )
 }
 
-function AddTaskModal({ onClose, onSave, settings }: { onClose: () => void; onSave: (data: Record<string, unknown>) => void; settings: import('../data/types').AppSettings }) {
+function AddTaskModal({ onClose, onSave, settings, defaultDate }: {
+  onClose: () => void
+  onSave: (data: Record<string, unknown>) => void
+  settings: import('../data/types').AppSettings
+  defaultDate?: string
+}) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [startTime, setStartTime] = useState(() => dayjs().add(5, 'minute').format('YYYY-MM-DDTHH:mm'))
+  const [startTime, setStartTime] = useState(() => {
+    const base = defaultDate ? dayjs(defaultDate).hour(9).minute(0) : dayjs().add(5, 'minute')
+    const now = dayjs()
+    return (base.isBefore(now) ? now.add(5, 'minute') : base).format('YYYY-MM-DDTHH:mm')
+  })
   const [duration, setDuration] = useState(settings.defaultDuration || 60)
   const [priority, setPriority] = useState<string>('medium')
   const [color, setColor] = useState(TASK_COLORS[0])
   const [tags, setTags] = useState('')
   const [focusMode, setFocusMode] = useState(false)
+  const [repeat, setRepeat] = useState('none')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
-    onSave({ title: title.trim(), description: description.trim() || undefined, startTime: new Date(startTime).toISOString(), durationMinutes: duration, priority, color, tags: tags.split(',').map(t => t.trim()).filter(Boolean), focusMode })
+    onSave({
+      title: title.trim(), description: description.trim() || undefined,
+      startTime: new Date(startTime).toISOString(), durationMinutes: duration,
+      priority, color, tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      focusMode, repeat
+    })
     onClose()
   }
 
@@ -109,10 +119,10 @@ function AddTaskModal({ onClose, onSave, settings }: { onClose: () => void; onSa
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Add Task</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl">✕</button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Title *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What are you working on?" required
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What are you working on?" required autoFocus
               className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           </div>
           <div>
@@ -141,14 +151,25 @@ function AddTaskModal({ onClose, onSave, settings }: { onClose: () => void; onSa
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Color</label>
-              <div className="flex gap-1.5 flex-wrap pt-1">
-                {TASK_COLORS.slice(0,8).map(c => (
-                  <button key={c} type="button" onClick={() => setColor(c)}
-                    className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-1 ring-indigo-400 scale-110' : ''}`}
-                    style={{ backgroundColor: c }} />
-                ))}
-              </div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Repeat 🔁</label>
+              <select value={repeat} onChange={e => setRepeat(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="none">No repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Color</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {TASK_COLORS.slice(0,8).map(c => (
+                <button key={c} type="button" onClick={() => setColor(c)}
+                  className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-1 ring-indigo-400 scale-110' : ''}`}
+                  style={{ backgroundColor: c }} />
+              ))}
             </div>
           </div>
           <div>
@@ -164,7 +185,9 @@ function AddTaskModal({ onClose, onSave, settings }: { onClose: () => void; onSa
           </label>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors">Add Task</button>
+            <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors">
+              Add Task {repeat !== 'none' ? `(${repeat})` : ''}
+            </button>
           </div>
         </form>
       </div>
@@ -197,15 +220,9 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Edit Task</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Title *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} required className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Description</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
-          </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <input value={title} onChange={e => setTitle(e.target.value)} required autoFocus className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Start Time</label>
@@ -232,10 +249,7 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
               </div>
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Tags (comma-separated)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-          </div>
+          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Tags: work, study" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           <label className="flex items-center gap-3 cursor-pointer">
             <div className={`relative w-10 h-5 rounded-full transition-colors ${focusMode ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`} onClick={() => setFocusMode(v => !v)}>
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${focusMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
@@ -254,13 +268,12 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
 }
 
 function ExtendModal({ taskId, onClose, onExtend }: { taskId: string; onClose: () => void; onExtend: (id: string, mins: number) => void }) {
-  const options = [15, 30, 45, 60, 90]
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-72 animate-slide-up" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4">Extend by how long?</h3>
         <div className="grid grid-cols-3 gap-2">
-          {options.map(m => (
+          {[15,30,45,60,90].map(m => (
             <button key={m} onClick={() => { onExtend(taskId, m); onClose() }}
               className="py-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-400 text-sm font-bold hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors">
               +{m}m
@@ -278,50 +291,112 @@ export default function TodayScreen({ navigate }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [editTask, setEditTask] = useState<Task | null>(null)
   const [extendId, setExtendId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
 
   const completed = todayTasks.filter(t => t.status === 'completed').length
   const skipped  = todayTasks.filter(t => t.status === 'skipped').length
   const bannerTask = activeTask ?? (todayTasks.find(t => isAwaitingDecision(t)) ?? null)
   const awaiting = bannerTask ? isAwaitingDecision(bannerTask) : false
 
+  const filteredTasks = useMemo(() => {
+    let list = todayTasks
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'active') {
+        list = list.filter(t => t.status !== 'completed' && t.status !== 'skipped' &&
+          new Date(t.startTime) <= new Date() && new Date(t.endTime) >= new Date())
+      } else {
+        list = list.filter(t => t.status === filterStatus)
+      }
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(t =>
+        t.title.toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q) ||
+        t.tags.some(tag => tag.toLowerCase().includes(q))
+      )
+    }
+    return list
+  }, [todayTasks, filterStatus, search])
+
   const handleComplete = useCallback((id: string) => { if (confirm('Mark task as done?')) completeTask(id) }, [completeTask])
   const handleSkip = useCallback((id: string) => { if (confirm('Skip this task?')) skipTask(id) }, [skipTask])
 
-  // 'N' key — quick add task
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
       if (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable) return
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setShowAdd(true) }
+      if (e.key === '/' || e.key === 'f' || e.key === 'F') { e.preventDefault(); document.getElementById('task-search')?.focus() }
+      if (e.key === 'Escape') { setSearch(''); setFilterStatus('all') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const FILTER_TABS: { id: FilterStatus; label: string; count: number }[] = [
+    { id: 'all', label: 'All', count: todayTasks.length },
+    { id: 'active', label: 'Active', count: todayTasks.filter(t => t.status !== 'completed' && t.status !== 'skipped' && new Date(t.startTime) <= new Date() && new Date(t.endTime) >= new Date()).length },
+    { id: 'scheduled', label: 'Scheduled', count: todayTasks.filter(t => t.status === 'scheduled').length },
+    { id: 'completed', label: 'Done', count: completed },
+    { id: 'skipped', label: 'Skipped', count: skipped },
+  ]
+
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{dayjs().format('dddd, MMMM D')}</h1>
-          <div className="flex items-center gap-3 mt-0.5">
-            <p className="text-sm text-gray-500 dark:text-gray-400">{completed}/{todayTasks.length} done</p>
-            {skipped > 0 && <p className="text-sm text-gray-400 dark:text-gray-500">{skipped} skipped</p>}
-            {todayTasks.length > 0 && (
-              <div className="flex-1 max-w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${todayTasks.length ? (completed / todayTasks.length) * 100 : 0}%` }} />
-              </div>
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{dayjs().format('dddd, MMMM D')}</h1>
+            <div className="flex items-center gap-3 mt-0.5">
+              <p className="text-sm text-gray-500 dark:text-gray-400">{completed}/{todayTasks.length} done</p>
+              {skipped > 0 && <p className="text-sm text-gray-400 dark:text-gray-500">{skipped} skipped</p>}
+              {todayTasks.length > 0 && (
+                <div className="flex-1 max-w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${todayTasks.length ? (completed / todayTasks.length) * 100 : 0}%` }} />
+                </div>
+              )}
+            </div>
+          </div>
+          <button onClick={() => setShowAdd(true)} title="Add task (N)" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors shadow-sm group">
+            <span>+ Add Task</span>
+            <kbd className="bg-indigo-400/50 border-indigo-300/50 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">N</kbd>
+          </button>
+        </div>
+
+        {/* Search + Filter row */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+            <input
+              id="task-search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tasks… (F)"
+              className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
             )}
           </div>
+          <div className="flex gap-1">
+            {FILTER_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                  filterStatus === tab.id
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {tab.label} {tab.count > 0 && <span className={`ml-0.5 ${filterStatus === tab.id ? 'opacity-80' : 'opacity-60'}`}>{tab.count}</span>}
+              </button>
+            ))}
+          </div>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          title="Add task (N)"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors shadow-sm group"
-        >
-          <span>+ Add Task</span>
-          <kbd className="bg-indigo-400/50 border-indigo-300/50 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">N</kbd>
-        </button>
       </div>
 
       {/* Active/awaiting banner */}
@@ -344,7 +419,19 @@ export default function TodayScreen({ navigate }: Props) {
 
       {/* Task list */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {todayTasks.length === 0 ? (
+        {(search || filterStatus !== 'all') && (
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {filteredTasks.length === 0 ? 'No results' : `${filteredTasks.length} task${filteredTasks.length !== 1 ? 's' : ''}`}
+              {search && ` for "${search}"`}
+            </span>
+            {(search || filterStatus !== 'all') && (
+              <button onClick={() => { setSearch(''); setFilterStatus('all') }} className="text-xs text-indigo-500 hover:text-indigo-600 font-semibold">Clear filters</button>
+            )}
+          </div>
+        )}
+
+        {filteredTasks.length === 0 && !search && filterStatus === 'all' ? (
           <div className="flex flex-col items-center justify-center h-56 text-center animate-fade-in">
             <div className="text-6xl mb-4 animate-bounce-in">📅</div>
             <p className="text-base font-bold text-gray-600 dark:text-gray-300">No tasks today</p>
@@ -352,23 +439,42 @@ export default function TodayScreen({ navigate }: Props) {
             <button onClick={() => setShowAdd(true)} className="px-5 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 transition-colors shadow-sm">
               + Schedule Your First Task
             </button>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-              Press <kbd>N</kbd> anywhere to quickly add a task
-            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">Tip: Press <kbd>N</kbd> to quickly add a task</p>
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-center animate-fade-in">
+            <div className="text-4xl mb-3">🔍</div>
+            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">No tasks match your filter</p>
+            <button onClick={() => { setSearch(''); setFilterStatus('all') }} className="mt-3 text-xs text-indigo-500 hover:underline font-semibold">Clear filters</button>
           </div>
         ) : (
-          todayTasks.map(task => (
-            <TaskCard key={task.id} task={task}
+          filteredTasks.map(task => (
+            <TaskCard
+              key={task.id} task={task}
               onComplete={handleComplete} onSkip={handleSkip}
-              onExtend={id => setExtendId(id)} onStartFocus={startFocusMode}
-              onEdit={setEditTask} />
+              onExtend={(id) => setExtendId(id)}
+              onStartFocus={startFocusMode}
+              onEdit={setEditTask}
+            />
           ))
         )}
       </div>
 
-      {showAdd && <AddTaskModal onClose={() => setShowAdd(false)} onSave={data => addTask(data as Parameters<typeof addTask>[0])} settings={state.settings} />}
-      {editTask && <EditTaskModal task={editTask} onClose={() => setEditTask(null)} onSave={updateTask} onDelete={deleteTask} />}
-      {extendId && <ExtendModal taskId={extendId} onClose={() => setExtendId(null)} onExtend={(id, mins) => extendTaskTime(id, mins)} />}
+      {showAdd && (
+        <AddTaskModal
+          onClose={() => setShowAdd(false)}
+          onSave={async (data) => {
+            await addTask(data as Parameters<typeof addTask>[0])
+          }}
+          settings={state.settings}
+        />
+      )}
+      {editTask && (
+        <EditTaskModal task={editTask} onClose={() => setEditTask(null)} onSave={updateTask} onDelete={deleteTask} />
+      )}
+      {extendId && (
+        <ExtendModal taskId={extendId} onClose={() => setExtendId(null)} onExtend={(id, mins) => extendTaskTime(id, mins)} />
+      )}
     </div>
   )
 }

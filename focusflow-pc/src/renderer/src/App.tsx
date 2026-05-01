@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import TodayScreen from './screens/TodayScreen'
+import WeekScreen from './screens/WeekScreen'
 import FocusScreen from './screens/FocusScreen'
 import StatsScreen from './screens/StatsScreen'
 import SettingsScreen from './screens/SettingsScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import ReportsScreen from './screens/ReportsScreen'
 import ActiveScreen from './screens/ActiveScreen'
+import NotesScreen from './screens/NotesScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 
-type Tab = 'today' | 'focus' | 'stats' | 'settings'
-type Page = Tab | 'profile' | 'reports' | 'active'
+type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
+type Page = Tab | 'profile' | 'reports' | 'active' | 'notes'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
-  { id: 'focus',    label: 'Focus',    icon: '🛡',  shortcut: '2' },
-  { id: 'stats',    label: 'Stats',    icon: '📊', shortcut: '3' },
-  { id: 'settings', label: 'Settings', icon: '⚙️', shortcut: '4' },
+  { id: 'week',     label: 'Week',     icon: '📆', shortcut: '2' },
+  { id: 'focus',    label: 'Focus',    icon: '🛡',  shortcut: '3' },
+  { id: 'stats',    label: 'Stats',    icon: '📊', shortcut: '4' },
+  { id: 'settings', label: 'Settings', icon: '⚙️', shortcut: '5' },
 ]
 
 function TitleBar({ isFocusing }: { isFocusing: boolean }) {
@@ -39,7 +42,7 @@ function TitleBar({ isFocusing }: { isFocusing: boolean }) {
     >
       <div className="flex items-center gap-2">
         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isFocusing ? 'bg-white/20' : 'bg-indigo-500'}`}>
-          <span className={`text-xs font-black ${isFocusing ? 'text-white' : 'text-white'}`}>F</span>
+          <span className="text-xs font-black text-white">F</span>
         </div>
         <span className={`text-sm font-bold ${isFocusing ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}>
           FocusFlow {isFocusing && <span className="font-normal opacity-80">— Focus Mode Active</span>}
@@ -71,47 +74,6 @@ function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   )
 }
 
-function ShortcutHint({ show }: { show: boolean }) {
-  if (!show) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => {}}>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 animate-bounce-in">
-        <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4">Keyboard Shortcuts</h3>
-        <div className="space-y-2 text-sm">
-          {[
-            ['1', 'Today'],
-            ['2', 'Focus'],
-            ['3', 'Stats'],
-            ['4', 'Settings'],
-            ['?', 'This help'],
-            ['Esc', 'Close modal'],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">{v}</span>
-              <kbd>{k}</kbd>
-            </div>
-          ))}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
-            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Global (system-wide)</p>
-            {[
-              ['Ctrl+Shift+Space', 'Show/Hide window'],
-              ['Ctrl+Shift+1–4', 'Navigate tabs'],
-            ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between mt-1">
-                <span className="text-gray-600 dark:text-gray-400 text-xs">{v}</span>
-                <kbd>{k}</kbd>
-              </div>
-            ))}
-          </div>
-        </div>
-        <button className="mt-4 w-full py-2 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors" onClick={() => {}}>
-          Got it
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function AppShell() {
   const { state } = useApp()
   const [page, setPage] = useState<Page>('today')
@@ -121,7 +83,7 @@ function AppShell() {
 
   const navigate = useCallback((p: Page) => {
     setPage(p)
-    if (['today', 'focus', 'stats', 'settings'].includes(p)) setActiveTab(p as Tab)
+    if (['today', 'week', 'focus', 'stats', 'settings'].includes(p)) setActiveTab(p as Tab)
   }, [])
 
   // Listen for navigate events from main process (global shortcuts, tray)
@@ -143,9 +105,10 @@ function AppShell() {
 
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === '1') navigate('today')
-        else if (e.key === '2') navigate('focus')
-        else if (e.key === '3') navigate('stats')
-        else if (e.key === '4') navigate('settings')
+        else if (e.key === '2') navigate('week')
+        else if (e.key === '3') navigate('focus')
+        else if (e.key === '4') navigate('stats')
+        else if (e.key === '5') navigate('settings')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -184,16 +147,16 @@ function AppShell() {
         <div className="bg-indigo-500 dark:bg-indigo-700 px-4 py-1.5 flex items-center gap-2 animate-fade-in">
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           <span className="text-xs font-semibold text-white">Focus session active — stay on track!</span>
-          <span className="ml-auto text-xs text-white/70">Press <kbd className="bg-white/20 border-white/30 text-white">2</kbd> to view timer</span>
+          <span className="ml-auto text-xs text-white/70">Press <kbd className="bg-white/20 border-white/30 text-white">3</kbd> to view timer</span>
         </div>
       )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className={`w-56 flex flex-col bg-white dark:bg-gray-900 border-r transition-colors sidebar-nav ${
+        <aside className={`w-52 flex flex-col bg-white dark:bg-gray-900 border-r transition-colors sidebar-nav ${
           isFocusing ? 'border-indigo-300 dark:border-indigo-700' : 'border-gray-200 dark:border-gray-700'
         } py-4`}>
-          <div className="px-4 mb-4">
+          <div className="px-4 mb-3">
             <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Navigation</div>
           </div>
 
@@ -204,7 +167,7 @@ function AppShell() {
                 onClick={() => navigate(item.id)}
                 title={`${item.label} (${item.shortcut})`}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
-                  activeTab === item.id && page === item.id
+                  activeTab === item.id && (page === item.id || (item.id === 'today' && page === 'today') || (item.id === 'week' && page === 'week'))
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
@@ -215,7 +178,7 @@ function AppShell() {
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 )}
                 <span className={`text-[10px] font-mono px-1 py-0.5 rounded border opacity-0 group-hover:opacity-60 transition-opacity ${
-                  activeTab === item.id && page === item.id
+                  activeTab === item.id
                     ? 'border-indigo-300 dark:border-indigo-600 text-indigo-400'
                     : 'border-gray-300 dark:border-gray-600 text-gray-400'
                 }`}>{item.shortcut}</span>
@@ -224,10 +187,11 @@ function AppShell() {
           </nav>
 
           <div className="px-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5 mt-2">
-            <div className="px-4 mb-2">
+            <div className="px-3 mb-2">
               <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">More</div>
             </div>
             {[
+              { id: 'notes' as Page, label: 'Daily Notes', icon: '📝' },
               { id: 'active' as Page, label: 'Active Status', icon: '⚡' },
               { id: 'reports' as Page, label: 'Reports', icon: '📋' },
               { id: 'profile' as Page, label: 'Profile', icon: '👤' },
@@ -235,7 +199,7 @@ function AppShell() {
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
                   page === item.id
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -248,7 +212,7 @@ function AppShell() {
           </div>
 
           {/* Streak + shortcut hint */}
-          <div className="px-4 pt-4 space-y-2">
+          <div className="px-4 pt-3 space-y-2">
             <StreakChip />
             <button
               onClick={() => setShowShortcuts(true)}
@@ -263,12 +227,14 @@ function AppShell() {
         {/* Main content */}
         <main className="flex-1 overflow-hidden page-enter">
           {page === 'today'    && <TodayScreen navigate={navigate} />}
+          {page === 'week'     && <WeekScreen navigate={navigate} />}
           {page === 'focus'    && <FocusScreen navigate={navigate} />}
           {page === 'stats'    && <StatsScreen />}
           {page === 'settings' && <SettingsScreen navigate={navigate} />}
           {page === 'profile'  && <ProfileScreen onBack={() => navigate('settings')} />}
           {page === 'reports'  && <ReportsScreen onBack={() => navigate('stats')} />}
           {page === 'active'   && <ActiveScreen navigate={navigate} />}
+          {page === 'notes'    && <NotesScreen />}
         </main>
       </div>
 
@@ -283,11 +249,14 @@ function AppShell() {
             <div className="space-y-2 text-sm">
               {([
                 ['1', 'Go to Today'],
-                ['2', 'Go to Focus'],
-                ['3', 'Go to Stats'],
-                ['4', 'Go to Settings'],
+                ['2', 'Go to Week View'],
+                ['3', 'Go to Focus'],
+                ['4', 'Go to Stats'],
+                ['5', 'Go to Settings'],
+                ['N', 'Quick-add task (Today)'],
+                ['F', 'Search tasks'],
                 ['?', 'Toggle this panel'],
-                ['Esc', 'Close modals'],
+                ['Esc', 'Close modals / clear search'],
               ] as [string, string][]).map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between">
                   <span className="text-gray-600 dark:text-gray-400">{v}</span>
@@ -299,9 +268,9 @@ function AppShell() {
                 {([
                   ['Ctrl+Shift+Space', 'Show / Hide window'],
                   ['Ctrl+Shift+1', 'Today'],
-                  ['Ctrl+Shift+2', 'Focus'],
-                  ['Ctrl+Shift+3', 'Stats'],
-                  ['Ctrl+Shift+4', 'Settings'],
+                  ['Ctrl+Shift+2', 'Week View'],
+                  ['Ctrl+Shift+3', 'Focus'],
+                  ['Ctrl+Shift+4', 'Stats'],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between mt-1.5">
                     <span className="text-gray-600 dark:text-gray-400 text-xs">{v}</span>

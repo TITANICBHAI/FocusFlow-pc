@@ -30,6 +30,11 @@ const api = {
     recordDayCompletion: (completed: number, total: number) => ipcRenderer.invoke('stats:recordDayCompletion', completed, total),
     getTodayOverrides: () => ipcRenderer.invoke('stats:getTodayOverrides'),
   },
+  notes: {
+    get: (date: string) => ipcRenderer.invoke('notes:get', date),
+    save: (date: string, content: string) => ipcRenderer.invoke('notes:save', date, content),
+    getRecentDates: (days: number) => ipcRenderer.invoke('notes:getRecentDates', days),
+  },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     showNotification: (title: string, body: string, urgency?: 'normal' | 'critical') => ipcRenderer.invoke('app:showNotification', title, body, urgency),

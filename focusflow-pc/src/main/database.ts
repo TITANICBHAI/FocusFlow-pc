@@ -62,6 +62,7 @@ export function initDatabase(): void {
       color TEXT NOT NULL DEFAULT '#6366f1',
       focus_mode INTEGER NOT NULL DEFAULT 0,
       focus_allowed_packages TEXT,
+      repeat_rule TEXT NOT NULL DEFAULT 'none',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -93,7 +94,19 @@ export function initDatabase(): void {
       completed INTEGER NOT NULL DEFAULT 0,
       total INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS daily_notes (
+      date TEXT PRIMARY KEY,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
   `)
+
+  // Migrations: safely add columns if they don't exist
+  const taskCols = (db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]).map(c => c.name)
+  if (!taskCols.includes('repeat_rule')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN repeat_rule TEXT NOT NULL DEFAULT 'none'`)
+  }
 }
 
 function rowToTask(row: Record<string, unknown>) {
@@ -112,6 +125,7 @@ function rowToTask(row: Record<string, unknown>) {
     color: row.color,
     focusMode: (row.focus_mode as number) === 1,
     focusAllowedPackages: rawFap ? JSON.parse(rawFap) : undefined,
+    repeatRule: (row.repeat_rule as string) || 'none',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -144,19 +158,74 @@ export function getTasksInDateRange(startISO: string, endISO: string) {
 
 export function insertTask(task: Record<string, unknown>): void {
   db.prepare(
-    `INSERT INTO tasks (id,title,description,start_time,end_time,duration_minutes,status,priority,tags,reminders,color,focus_mode,focus_allowed_packages,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  ).run(task.id, task.title, task.description ?? null, task.startTime, task.endTime, task.durationMinutes, task.status, task.priority,
-        JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []), task.color, task.focusMode ? 1 : 0,
-        task.focusAllowedPackages !== undefined ? JSON.stringify(task.focusAllowedPackages) : null, task.createdAt, task.updatedAt)
+    `INSERT INTO tasks (id,title,description,start_time,end_time,duration_minutes,status,priority,tags,reminders,color,focus_mode,focus_allowed_packages,repeat_rule,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(
+    task.id, task.title, task.description ?? null, task.startTime, task.endTime,
+    task.durationMinutes, task.status, task.priority,
+    JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []),
+    task.color, task.focusMode ? 1 : 0,
+    task.focusAllowedPackages !== undefined ? JSON.stringify(task.focusAllowedPackages) : null,
+    task.repeat ?? task.repeatRule ?? 'none',
+    task.createdAt, task.updatedAt
+  )
+
+  // Auto-schedule recurring: create next occurrence immediately
+  const repeat = (task.repeat ?? task.repeatRule ?? 'none') as string
+  if (repeat && repeat !== 'none') {
+    scheduleNextRecurrence(task, repeat)
+  }
+}
+
+function scheduleNextRecurrence(task: Record<string, unknown>, repeat: string): void {
+  const start = new Date(task.startTime as string)
+  const end = new Date(task.endTime as string)
+  const dur = task.durationMinutes as number
+
+  let nextStart: Date | null = null
+
+  if (repeat === 'daily') {
+    nextStart = new Date(start); nextStart.setDate(nextStart.getDate() + 1)
+  } else if (repeat === 'weekdays') {
+    nextStart = new Date(start)
+    do { nextStart.setDate(nextStart.getDate() + 1) } while ([0, 6].includes(nextStart.getDay()))
+  } else if (repeat === 'weekly') {
+    nextStart = new Date(start); nextStart.setDate(nextStart.getDate() + 7)
+  } else if (repeat === 'monthly') {
+    nextStart = new Date(start); nextStart.setMonth(nextStart.getMonth() + 1)
+  }
+
+  if (!nextStart) return
+
+  const nextEnd = new Date(nextStart.getTime() + (end.getTime() - start.getTime()))
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  const now = new Date().toISOString()
+
+  db.prepare(
+    `INSERT OR IGNORE INTO tasks (id,title,description,start_time,end_time,duration_minutes,status,priority,tags,reminders,color,focus_mode,focus_allowed_packages,repeat_rule,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(
+    id, task.title, task.description ?? null,
+    nextStart.toISOString(), nextEnd.toISOString(), dur,
+    'scheduled', task.priority,
+    JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []),
+    task.color, task.focusMode ? 1 : 0, null,
+    repeat, now, now
+  )
 }
 
 export function updateTask(task: Record<string, unknown>): void {
   db.prepare(
-    `UPDATE tasks SET title=?,description=?,start_time=?,end_time=?,duration_minutes=?,status=?,priority=?,tags=?,reminders=?,color=?,focus_mode=?,focus_allowed_packages=?,updated_at=? WHERE id=?`
-  ).run(task.title, task.description ?? null, task.startTime, task.endTime, task.durationMinutes, task.status, task.priority,
-        JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []), task.color, task.focusMode ? 1 : 0,
-        task.focusAllowedPackages !== undefined ? JSON.stringify(task.focusAllowedPackages) : null, task.updatedAt, task.id)
+    `UPDATE tasks SET title=?,description=?,start_time=?,end_time=?,duration_minutes=?,status=?,priority=?,tags=?,reminders=?,color=?,focus_mode=?,focus_allowed_packages=?,repeat_rule=?,updated_at=? WHERE id=?`
+  ).run(
+    task.title, task.description ?? null, task.startTime, task.endTime,
+    task.durationMinutes, task.status, task.priority,
+    JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []),
+    task.color, task.focusMode ? 1 : 0,
+    task.focusAllowedPackages !== undefined ? JSON.stringify(task.focusAllowedPackages) : null,
+    task.repeatRule ?? 'none',
+    task.updatedAt, task.id
+  )
 }
 
 export function deleteTask(id: string): void {
@@ -268,4 +337,23 @@ export function getRecentDayCompletions(days: number): { date: string; completed
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days + 1); cutoff.setHours(0,0,0,0)
   const cutoffStr = cutoff.toISOString().slice(0, 10)
   return db.prepare(`SELECT date,completed,total FROM daily_completions WHERE date >= ? ORDER BY date ASC`).all(cutoffStr) as { date: string; completed: number; total: number }[]
+}
+
+// ── Daily Notes ───────────────────────────────────────────────────────────────
+
+export function getNoteForDate(date: string): string {
+  const row = db.prepare(`SELECT content FROM daily_notes WHERE date=?`).get(date) as { content: string } | undefined
+  return row?.content ?? ''
+}
+
+export function saveNote(date: string, content: string): void {
+  const now = new Date().toISOString()
+  db.prepare(`INSERT OR REPLACE INTO daily_notes (date,content,updated_at) VALUES (?,?,?)`).run(date, content, now)
+}
+
+export function getRecentNoteDates(days: number): string[] {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days + 1); cutoff.setHours(0,0,0,0)
+  const cutoffStr = cutoff.toISOString().slice(0, 10)
+  const rows = db.prepare(`SELECT date FROM daily_notes WHERE date >= ? AND content != '' ORDER BY date DESC`).all(cutoffStr) as { date: string }[]
+  return rows.map(r => r.date)
 }
