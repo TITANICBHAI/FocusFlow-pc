@@ -32,7 +32,7 @@ const api = {
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
-    showNotification: (title: string, body: string) => ipcRenderer.invoke('app:showNotification', title, body),
+    showNotification: (title: string, body: string, urgency?: 'normal' | 'critical') => ipcRenderer.invoke('app:showNotification', title, body, urgency),
     exportBackup: (data: string) => ipcRenderer.invoke('app:exportBackup', data),
     importBackup: (path: string) => ipcRenderer.invoke('app:importBackup', path),
   },
@@ -40,7 +40,14 @@ const api = {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
-  }
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  },
+  on: (channel: string, listener: (...args: unknown[]) => void) => {
+    ipcRenderer.on(channel, (_event, ...args) => listener(...args))
+  },
+  off: (channel: string, listener: (...args: unknown[]) => void) => {
+    ipcRenderer.off(channel, (_event, ...args) => listener(...args))
+  },
 }
 
 export type ElectronAPI = typeof api

@@ -285,3 +285,52 @@ node /tmp/push-to-github.mjs
 cd /home/runner/workspace/focusflow-pc
 GITHUB_TOKEN=ghp_YOUR_TOKEN bash push-to-github.sh
 ```
+
+---
+
+## ✅ Phase 13: Polish & Feature Additions (DONE — 2026-05-01)
+
+### New in this pass:
+
+**Main Process (`src/main/index.ts`)**
+- [x] `globalShortcut` — 5 global system hotkeys registered:
+  - `Ctrl+Shift+Space` — Show/Hide window from anywhere on desktop
+  - `Ctrl+Shift+1` — Jump to Today tab
+  - `Ctrl+Shift+2` — Jump to Focus tab
+  - `Ctrl+Shift+3` — Jump to Stats tab
+  - `Ctrl+Shift+4` — Jump to Settings tab
+- [x] `globalShortcut.unregisterAll()` on `will-quit` (no leftover shortcuts)
+- [x] `window:isMaximized` IPC handler added for TitleBar maximize toggle
+- [x] Notification `icon` + click handler (clicking notification shows window)
+- [x] Tray menu includes named shortcuts: "Today (Ctrl+Shift+1)"
+- [x] `showAndNavigate()` helper sends `navigate` IPC event to renderer
+- [x] `backgroundColor: '#f9fafb'` on BrowserWindow (no white flash on load)
+- [x] `spellcheck: false` (not needed in a task manager)
+
+**Preload (`src/preload/index.ts`)**
+- [x] `window.api.on(channel, listener)` — listen for main→renderer IPC events
+- [x] `window.api.off(channel, listener)` — clean up listeners
+- [x] `window.api.window.isMaximized()` — sync maximize button state
+- [x] `showNotification` accepts optional `urgency: 'normal' | 'critical'`
+
+**App Shell (`src/renderer/src/App.tsx`)**
+- [x] TitleBar changes color to indigo when Focus Mode is active
+- [x] Focus mode top banner (green pulse + "stay on track!" message)
+- [x] Keyboard shortcut numbers (1–4) shown on hover in sidebar
+- [x] `useEffect` subscribes to `navigate` IPC events (global shortcuts work)
+- [x] In-window keyboard shortcuts: `1/2/3/4` navigate tabs, `?` opens help
+- [x] Keyboard Shortcut Help modal (full list, animated, click-outside closes)
+- [x] "?" button at bottom of sidebar to open shortcut help
+- [x] Maximize button shows ❐/□ based on `isMaximized()` state
+
+**CSS (`src/renderer/src/index.css`)**
+- [x] `slide-in-right`, `bounce-in`, `focus-pulse`, `shimmer` animations
+- [x] `.skeleton` shimmer class for loading states
+- [x] `kbd` element styled (shortcut chips)
+- [x] `-webkit-user-select: none` globally (desktop feel, inputs exempt)
+- [x] Better scrollbar hover state
+
+**Build verification:** ✅
+- Main: 21.17kB (was 19.76kB — +6.6% for global shortcuts)
+- Preload: 2.79kB (was 2.47kB — +13% for IPC helpers)
+- Renderer: 50 modules, 0 errors (unchanged module count)

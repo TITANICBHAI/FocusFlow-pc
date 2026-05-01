@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase, getAllTasks, insertTask, updateTask, deleteTask, getSettings, saveSettings, startFocusSession, endFocusSession, getActiveFocusSession, getTodayFocusMinutes, getStreak, getBestStreak, getAllTimeFocusMinutes, getAllTimeFocusSessions, getRecentDayCompletions, backfillDayCompletions, recordDayCompletion, getTodayOverrideCount, logFocusOverride, getTasksInDateRange, getRecentUnresolvedTasks } from './database'
@@ -18,17 +18,20 @@ function createWindow(): void {
     autoHideMenuBar: true,
     frame: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    backgroundColor: '#f9fafb',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      spellcheck: false,
     },
     icon: join(__dirname, '../../build/icon.png')
   })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow!.show()
+    mainWindow!.focus()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -59,17 +62,39 @@ function createTray(): void {
     icon = nativeImage.createEmpty()
   }
 
-  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAbwAAAG8B8aLcQwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFpSURBVDiNpZM9SwNBEIafvYuJGD9Q0EIsLCwsLCwsLC0sLCwsFBQUFBQUFBT8AQoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCg==') : icon)
+  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==') : icon)
 
-  const contextMenu = Menu.buildFromTemplate([
+  const buildMenu = () => Menu.buildFromTemplate([
     { label: 'Open FocusFlow', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { type: 'separator' },
-    { label: 'Quit', click: () => { app.isQuiting = true; app.quit() } }
+    { label: 'Today (Ctrl+Shift+1)', click: () => { showAndNavigate('today') } },
+    { label: 'Focus (Ctrl+Shift+2)', click: () => { showAndNavigate('focus') } },
+    { label: 'Stats (Ctrl+Shift+3)', click: () => { showAndNavigate('stats') } },
+    { type: 'separator' },
+    { label: 'Quit FocusFlow', click: () => { app.isQuiting = true; app.quit() } }
   ])
 
-  tray.setToolTip('FocusFlow')
-  tray.setContextMenu(contextMenu)
+  tray.setToolTip('FocusFlow — Stay Focused')
+  tray.setContextMenu(buildMenu())
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus() })
+}
+
+function showAndNavigate(page: string): void {
+  mainWindow?.show()
+  mainWindow?.focus()
+  mainWindow?.webContents.send('navigate', page)
+}
+
+function registerGlobalShortcuts(): void {
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    if (mainWindow?.isVisible()) mainWindow.hide()
+    else { mainWindow?.show(); mainWindow?.focus() }
+  })
+
+  globalShortcut.register('CommandOrControl+Shift+1', () => showAndNavigate('today'))
+  globalShortcut.register('CommandOrControl+Shift+2', () => showAndNavigate('focus'))
+  globalShortcut.register('CommandOrControl+Shift+3', () => showAndNavigate('stats'))
+  globalShortcut.register('CommandOrControl+Shift+4', () => showAndNavigate('settings'))
 }
 
 app.whenReady().then(() => {
@@ -80,6 +105,7 @@ app.whenReady().then(() => {
   backfillDayCompletions(30)
   createWindow()
   createTray()
+  registerGlobalShortcuts()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -89,6 +115,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 declare global { namespace Electron { interface App { isQuiting?: boolean } } }
@@ -125,8 +155,16 @@ ipcMain.handle('stats:recordDayCompletion', (_, completed: number, total: number
 ipcMain.handle('stats:getTodayOverrides', () => getTodayOverrideCount())
 
 ipcMain.handle('app:getVersion', () => app.getVersion())
-ipcMain.handle('app:showNotification', (_, title: string, body: string) => {
-  new Notification({ title, body }).show()
+ipcMain.handle('app:showNotification', (_, title: string, body: string, urgency?: 'normal' | 'critical') => {
+  const n = new Notification({
+    title,
+    body,
+    icon: join(__dirname, '../../build/icon.png'),
+    urgency: urgency ?? 'normal',
+    timeoutType: 'default',
+  })
+  n.on('click', () => { mainWindow?.show(); mainWindow?.focus() })
+  n.show()
 })
 
 ipcMain.handle('app:exportBackup', (_, data: string) => {
@@ -142,3 +180,4 @@ ipcMain.handle('app:importBackup', (_, path: string) => {
 ipcMain.handle('window:minimize', () => mainWindow?.minimize())
 ipcMain.handle('window:maximize', () => { if (mainWindow?.isMaximized()) mainWindow.unmaximize(); else mainWindow?.maximize() })
 ipcMain.handle('window:close', () => mainWindow?.hide())
+ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)

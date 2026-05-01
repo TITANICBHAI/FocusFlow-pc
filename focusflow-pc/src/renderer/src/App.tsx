@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import TodayScreen from './screens/TodayScreen'
 import FocusScreen from './screens/FocusScreen'
@@ -12,27 +12,101 @@ import OnboardingScreen from './screens/OnboardingScreen'
 type Tab = 'today' | 'focus' | 'stats' | 'settings'
 type Page = Tab | 'profile' | 'reports' | 'active'
 
-const NAV_ITEMS = [
-  { id: 'today' as Tab, label: 'Today', icon: '📅' },
-  { id: 'focus' as Tab, label: 'Focus', icon: '🛡' },
-  { id: 'stats' as Tab, label: 'Stats', icon: '📊' },
-  { id: 'settings' as Tab, label: 'Settings', icon: '⚙️' },
+const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
+  { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
+  { id: 'focus',    label: 'Focus',    icon: '🛡',  shortcut: '2' },
+  { id: 'stats',    label: 'Stats',    icon: '📊', shortcut: '3' },
+  { id: 'settings', label: 'Settings', icon: '⚙️', shortcut: '4' },
 ]
 
-function TitleBar() {
+function TitleBar({ isFocusing }: { isFocusing: boolean }) {
+  const [isMax, setIsMax] = useState(false)
+
+  const handleMaximize = async () => {
+    await window.api.window.maximize()
+    const max = await window.api.window.isMaximized()
+    setIsMax(!!max)
+  }
+
   return (
-    <div className="flex items-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2 select-none" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+    <div
+      className={`flex items-center border-b px-4 py-2 select-none transition-colors ${
+        isFocusing
+          ? 'bg-indigo-600 dark:bg-indigo-800 border-indigo-500'
+          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+      }`}
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    >
       <div className="flex items-center gap-2">
-        <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
-          <span className="text-white text-xs font-bold">F</span>
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isFocusing ? 'bg-white/20' : 'bg-indigo-500'}`}>
+          <span className={`text-xs font-black ${isFocusing ? 'text-white' : 'text-white'}`}>F</span>
         </div>
-        <span className="text-sm font-bold text-gray-800 dark:text-gray-100">FocusFlow</span>
+        <span className={`text-sm font-bold ${isFocusing ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}>
+          FocusFlow {isFocusing && <span className="font-normal opacity-80">— Focus Mode Active</span>}
+        </span>
       </div>
       <div className="flex-1" />
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <button onClick={() => window.api.window.minimize()} className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 transition-colors">─</button>
-        <button onClick={() => window.api.window.maximize()} className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 transition-colors">□</button>
-        <button onClick={() => window.api.window.close()} className="w-6 h-6 rounded-full bg-red-400 hover:bg-red-500 flex items-center justify-center text-xs text-white transition-colors">✕</button>
+        <button
+          onClick={() => window.api.window.minimize()}
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors ${
+            isFocusing ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'
+          }`}
+          title="Minimize"
+        >─</button>
+        <button
+          onClick={handleMaximize}
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors ${
+            isFocusing ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'
+          }`}
+          title={isMax ? 'Restore' : 'Maximize'}
+        >{isMax ? '❐' : '□'}</button>
+        <button
+          onClick={() => window.api.window.close()}
+          className="w-6 h-6 rounded-full bg-red-400 hover:bg-red-500 flex items-center justify-center text-xs text-white transition-colors"
+          title="Close to tray"
+        >✕</button>
+      </div>
+    </div>
+  )
+}
+
+function ShortcutHint({ show }: { show: boolean }) {
+  if (!show) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => {}}>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 animate-bounce-in">
+        <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4">Keyboard Shortcuts</h3>
+        <div className="space-y-2 text-sm">
+          {[
+            ['1', 'Today'],
+            ['2', 'Focus'],
+            ['3', 'Stats'],
+            ['4', 'Settings'],
+            ['?', 'This help'],
+            ['Esc', 'Close modal'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between">
+              <span className="text-gray-600 dark:text-gray-400">{v}</span>
+              <kbd>{k}</kbd>
+            </div>
+          ))}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Global (system-wide)</p>
+            {[
+              ['Ctrl+Shift+Space', 'Show/Hide window'],
+              ['Ctrl+Shift+1–4', 'Navigate tabs'],
+            ].map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between mt-1">
+                <span className="text-gray-600 dark:text-gray-400 text-xs">{v}</span>
+                <kbd>{k}</kbd>
+              </div>
+            ))}
+          </div>
+        </div>
+        <button className="mt-4 w-full py-2 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors" onClick={() => {}}>
+          Got it
+        </button>
       </div>
     </div>
   )
@@ -42,11 +116,46 @@ function AppShell() {
   const { state } = useApp()
   const [page, setPage] = useState<Page>('today')
   const [activeTab, setActiveTab] = useState<Tab>('today')
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const isFocusing = !!state.focusSession
+
+  const navigate = useCallback((p: Page) => {
+    setPage(p)
+    if (['today', 'focus', 'stats', 'settings'].includes(p)) setActiveTab(p as Tab)
+  }, [])
+
+  // Listen for navigate events from main process (global shortcuts, tray)
+  useEffect(() => {
+    const handler = (p: unknown) => { if (typeof p === 'string') navigate(p as Page) }
+    window.api.on('navigate', handler)
+    return () => window.api.off('navigate', handler)
+  }, [navigate])
+
+  // In-window keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+      if (isInput) return
+
+      if (e.key === '?' || (e.key === '/' && e.shiftKey)) { e.preventDefault(); setShowShortcuts(s => !s); return }
+      if (e.key === 'Escape') { setShowShortcuts(false); return }
+
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === '1') navigate('today')
+        else if (e.key === '2') navigate('focus')
+        else if (e.key === '3') navigate('stats')
+        else if (e.key === '4') navigate('settings')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigate])
 
   if (!state.isDbReady) {
     return (
       <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
-        <TitleBar />
+        <TitleBar isFocusing={false} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -60,46 +169,61 @@ function AppShell() {
   if (!state.settings.onboardingComplete) {
     return (
       <div className="flex flex-col h-full">
-        <TitleBar />
+        <TitleBar isFocusing={false} />
         <OnboardingScreen />
       </div>
     )
   }
 
-  const navigate = (p: Page) => {
-    setPage(p)
-    if (['today','focus','stats','settings'].includes(p)) setActiveTab(p as Tab)
-  }
-
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
-      <TitleBar />
+    <div className={`flex flex-col h-full bg-gray-50 dark:bg-gray-900 ${isFocusing ? 'focus-mode-active' : ''}`}>
+      <TitleBar isFocusing={isFocusing} />
+
+      {/* Focus mode top banner */}
+      {isFocusing && (
+        <div className="bg-indigo-500 dark:bg-indigo-700 px-4 py-1.5 flex items-center gap-2 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-xs font-semibold text-white">Focus session active — stay on track!</span>
+          <span className="ml-auto text-xs text-white/70">Press <kbd className="bg-white/20 border-white/30 text-white">2</kbd> to view timer</span>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-56 flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 py-4">
-          <div className="px-4 mb-6">
-            <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Navigation</div>
+        <aside className={`w-56 flex flex-col bg-white dark:bg-gray-900 border-r transition-colors sidebar-nav ${
+          isFocusing ? 'border-indigo-300 dark:border-indigo-700' : 'border-gray-200 dark:border-gray-700'
+        } py-4`}>
+          <div className="px-4 mb-4">
+            <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Navigation</div>
           </div>
-          <nav className="flex-1 px-2 space-y-1">
+
+          <nav className="flex-1 px-2 space-y-0.5">
             {NAV_ITEMS.map(item => (
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                title={`${item.label} (${item.shortcut})`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
                   activeTab === item.id && page === item.id
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
-                <span className="text-base">{item.icon}</span>
-                {item.label}
-                {item.id === 'focus' && state.focusSession && (
-                  <span className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-base w-5 text-center">{item.icon}</span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.id === 'focus' && isFocusing && (
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 )}
+                <span className={`text-[10px] font-mono px-1 py-0.5 rounded border opacity-0 group-hover:opacity-60 transition-opacity ${
+                  activeTab === item.id && page === item.id
+                    ? 'border-indigo-300 dark:border-indigo-600 text-indigo-400'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-400'
+                }`}>{item.shortcut}</span>
               </button>
             ))}
           </nav>
-          <div className="px-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-1 mt-2">
+
+          <div className="px-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5 mt-2">
             <div className="px-4 mb-2">
               <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">More</div>
             </div>
@@ -117,28 +241,84 @@ function AppShell() {
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
-                <span className="text-base">{item.icon}</span>
+                <span className="text-base w-5 text-center">{item.icon}</span>
                 {item.label}
               </button>
             ))}
           </div>
-          {/* Streak chip */}
-          <div className="px-4 pt-4">
+
+          {/* Streak + shortcut hint */}
+          <div className="px-4 pt-4 space-y-2">
             <StreakChip />
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors py-1"
+            >
+              <kbd>?</kbd>
+              <span>Shortcuts</span>
+            </button>
           </div>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-hidden">
-          {page === 'today' && <TodayScreen navigate={navigate} />}
-          {page === 'focus' && <FocusScreen navigate={navigate} />}
-          {page === 'stats' && <StatsScreen />}
+        <main className="flex-1 overflow-hidden page-enter">
+          {page === 'today'    && <TodayScreen navigate={navigate} />}
+          {page === 'focus'    && <FocusScreen navigate={navigate} />}
+          {page === 'stats'    && <StatsScreen />}
           {page === 'settings' && <SettingsScreen navigate={navigate} />}
-          {page === 'profile' && <ProfileScreen onBack={() => navigate('settings')} />}
-          {page === 'reports' && <ReportsScreen onBack={() => navigate('stats')} />}
-          {page === 'active' && <ActiveScreen navigate={navigate} />}
+          {page === 'profile'  && <ProfileScreen onBack={() => navigate('settings')} />}
+          {page === 'reports'  && <ReportsScreen onBack={() => navigate('stats')} />}
+          {page === 'active'   && <ActiveScreen navigate={navigate} />}
         </main>
       </div>
+
+      {/* Keyboard shortcut modal */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-80 animate-bounce-in" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4">⌨️ Keyboard Shortcuts</h3>
+            <div className="space-y-2 text-sm">
+              {([
+                ['1', 'Go to Today'],
+                ['2', 'Go to Focus'],
+                ['3', 'Go to Stats'],
+                ['4', 'Go to Settings'],
+                ['?', 'Toggle this panel'],
+                ['Esc', 'Close modals'],
+              ] as [string, string][]).map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">{v}</span>
+                  <kbd>{k}</kbd>
+                </div>
+              ))}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Global shortcuts</p>
+                {([
+                  ['Ctrl+Shift+Space', 'Show / Hide window'],
+                  ['Ctrl+Shift+1', 'Today'],
+                  ['Ctrl+Shift+2', 'Focus'],
+                  ['Ctrl+Shift+3', 'Stats'],
+                  ['Ctrl+Shift+4', 'Settings'],
+                ] as [string, string][]).map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between mt-1.5">
+                    <span className="text-gray-600 dark:text-gray-400 text-xs">{v}</span>
+                    <kbd className="text-[10px]">{k}</kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button
+              className="mt-4 w-full py-2 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors"
+              onClick={() => setShowShortcuts(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

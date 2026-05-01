@@ -280,11 +280,23 @@ export default function TodayScreen({ navigate }: Props) {
   const [extendId, setExtendId] = useState<string | null>(null)
 
   const completed = todayTasks.filter(t => t.status === 'completed').length
+  const skipped  = todayTasks.filter(t => t.status === 'skipped').length
   const bannerTask = activeTask ?? (todayTasks.find(t => isAwaitingDecision(t)) ?? null)
   const awaiting = bannerTask ? isAwaitingDecision(bannerTask) : false
 
   const handleComplete = useCallback((id: string) => { if (confirm('Mark task as done?')) completeTask(id) }, [completeTask])
   const handleSkip = useCallback((id: string) => { if (confirm('Skip this task?')) skipTask(id) }, [skipTask])
+
+  // 'N' key — quick add task
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable) return
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setShowAdd(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -292,10 +304,23 @@ export default function TodayScreen({ navigate }: Props) {
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{dayjs().format('dddd, MMMM D')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{completed}/{todayTasks.length} tasks done</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{completed}/{todayTasks.length} done</p>
+            {skipped > 0 && <p className="text-sm text-gray-400 dark:text-gray-500">{skipped} skipped</p>}
+            {todayTasks.length > 0 && (
+              <div className="flex-1 max-w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${todayTasks.length ? (completed / todayTasks.length) * 100 : 0}%` }} />
+              </div>
+            )}
+          </div>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors shadow-sm">
-          + Add Task
+        <button
+          onClick={() => setShowAdd(true)}
+          title="Add task (N)"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors shadow-sm group"
+        >
+          <span>+ Add Task</span>
+          <kbd className="bg-indigo-400/50 border-indigo-300/50 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">N</kbd>
         </button>
       </div>
 
@@ -320,11 +345,16 @@ export default function TodayScreen({ navigate }: Props) {
       {/* Task list */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {todayTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center">
-            <div className="text-5xl mb-3">📅</div>
-            <p className="text-base font-semibold text-gray-500 dark:text-gray-400">No tasks scheduled today</p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Tap "Add Task" to get started</p>
-            <button onClick={() => setShowAdd(true)} className="mt-4 px-5 py-2 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 transition-colors">+ Add First Task</button>
+          <div className="flex flex-col items-center justify-center h-56 text-center animate-fade-in">
+            <div className="text-6xl mb-4 animate-bounce-in">📅</div>
+            <p className="text-base font-bold text-gray-600 dark:text-gray-300">No tasks today</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-4">Plan your day to stay focused</p>
+            <button onClick={() => setShowAdd(true)} className="px-5 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 transition-colors shadow-sm">
+              + Schedule Your First Task
+            </button>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+              Press <kbd>N</kbd> anywhere to quickly add a task
+            </p>
           </div>
         ) : (
           todayTasks.map(task => (
