@@ -211,8 +211,9 @@ function AppShell() {
             ))}
           </div>
 
-          {/* Streak + shortcut hint */}
+          {/* Today progress + Streak + shortcut hint */}
           <div className="px-4 pt-3 space-y-2">
+            <TodayProgressBar />
             <StreakChip />
             <button
               onClick={() => setShowShortcuts(true)}
@@ -304,6 +305,26 @@ function StreakChip() {
       <div>
         <div className="text-xs font-bold text-orange-600 dark:text-orange-400">{streak}-day streak!</div>
         <div className="text-[10px] text-orange-500/70 dark:text-orange-400/60">Keep it up</div>
+      </div>
+    </div>
+  )
+}
+
+function TodayProgressBar() {
+  const { todayTasks } = useApp()
+  const done  = todayTasks.filter(t => t.status === 'completed').length
+  const total = todayTasks.length
+  if (total === 0) return null
+  const pct = Math.round((done / total) * 100)
+  const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#6366f1' : '#f59e0b'
+  return (
+    <div className="px-3 pb-1">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">Today</span>
+        <span className="text-[10px] font-bold" style={{ color }}>{done}/{total}</span>
+      </div>
+      <div className="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
   )
