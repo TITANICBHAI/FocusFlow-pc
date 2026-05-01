@@ -20,249 +20,154 @@ Deploy: GitHub + GitHub Actions → Windows `.exe` auto-build on every push
 | 7. App Shell | ✅ DONE | Sidebar nav + TitleBar |
 | 8. All 8 Screens | ✅ DONE | 1717 lines of screen code |
 | 9. Build Tooling & CI | ✅ DONE | GitHub Actions .yml |
-| 10. Build Verification | ✅ DONE | 50 modules, 0 errors |
-| 11. GitHub Push | 🔴 BLOCKED | Token expired — needs renewal |
+| 10. Build Verification | ✅ DONE | 52 modules, 0 errors |
+| 11. GitHub Push | 🔴 BLOCKED | Token expired — use /api/push UI |
 | 12. CI Verification | 🔲 TODO | After push succeeds |
+| 13. Polish & Shortcuts | ✅ DONE | Global shortcuts, focus banner, kbd hints |
+| 14. Major Feature Set | ✅ DONE | Week View, Pomodoro+sound, Search/Filter, Recurring, Notes |
+| 15. Timeline & Templates | ✅ DONE | Visual timeline, task templates, live focus timer |
 
 ---
 
-## ✅ Phase 1: Source Analysis (DONE)
-- [x] Clone https://github.com/TITANICBHAI/FocusFlow
-- [x] types.ts (Task, AppSettings, UserProfile, FocusSession, etc.)
-- [x] database.ts (SQLite schema, all DB query functions)
-- [x] AppContext.tsx (state, actions, focus mode, backfill)
-- [x] TodayTab → TodayScreen (schedule, add/edit/skip/extend, active banner)
-- [x] FocusTab → FocusScreen (SVG ring timer, focus mode, overrides)
-- [x] StatsTab → StatsScreen (heatmap, streaks, milestones, bar chart)
-- [x] SettingsTab → SettingsScreen (dark mode, pomodoro, notifications, blockers)
-- [x] ReportsScreen (focus hero, breakdown, distraction count)
-- [x] ActiveScreen (live enforcement dashboard)
-- [x] AlwaysOnScreen → Adapted as Blocked Websites (PC equiv)
-- [x] BlockDefenseScreen → Merged into Settings PC tab
-- [x] KeywordBlockerScreen → KeywordModal in Settings
-- [x] UserProfileScreen → ProfileScreen
-- [x] OnboardingScreen (5-step wizard)
+## ✅ Phase 14: Major Feature Set (DONE — 2026-05-01)
+
+### WeekScreen.tsx (NEW — 7-day grid)
+- [x] 7-column Mon–Sun grid, prev/next week navigation
+- [x] Today's column highlighted in indigo
+- [x] Per-day completion progress bar + done/total count
+- [x] Mini task cards with hover complete/skip actions
+- [x] "+ Add Task" per day (pre-fills date in modal)
+- [x] Week-level progress bar in header
+
+### FocusScreen.tsx (MAJOR UPGRADE)
+- [x] Real Pomodoro timer — 25m work / 5m break × 4 intervals
+- [x] Web Audio API beep at every phase transition (no audio file needed)
+- [x] Desktop notification at each phase change
+- [x] Pomodoro progress dots showing completed intervals
+- [x] Ring turns green during break, task color during work
+- [x] "Skip to Break / Skip Break" button
+- [x] Pomodoro settings mini-popup during session
+- [x] Ctrl+Enter to complete task from Focus screen
+
+### TodayScreen.tsx (UPGRADED)
+- [x] Search bar — filter tasks by title/description/tags
+- [x] Status filter chips: All / Active / Scheduled / Done / Skipped
+- [x] F key focuses search; Esc clears filters
+- [x] Repeat field in AddTask modal (none/daily/weekdays/weekly/monthly)
+
+### database.ts (UPGRADED)
+- [x] `daily_notes` table (date PRIMARY KEY, content, updated_at)
+- [x] `repeat_rule` column on tasks (with safe ALTER TABLE migration)
+- [x] `scheduleNextRecurrence()` — auto-creates next occurrence on insert
+- [x] `getNoteForDate`, `saveNote`, `getRecentNoteDates` functions
+
+### main/index.ts + preload/index.ts (UPGRADED)
+- [x] `notes:get`, `notes:save`, `notes:getRecentDates` IPC handlers
+- [x] `window.api.notes` exposed via contextBridge
+- [x] Tray menu updated: Today/Week/Focus/Stats items
+
+### NotesScreen.tsx (NEW)
+- [x] Full-page daily journal editor
+- [x] Auto-save with 800ms debounce + save indicator
+- [x] 14-day sidebar with past note dates
+- [x] Daily writing prompt (cycles through 6 prompts based on date)
+- [x] Character count display
 
 ---
 
-## ✅ Phase 2: Project Structure (DONE)
-- [x] `package.json` — Electron 29, electron-vite 2, React 18, TS 5, Tailwind 3
-- [x] `electron.vite.config.ts` — Main/preload/renderer build config
-- [x] `tsconfig.json` + `tsconfig.node.json` + `tsconfig.web.json`
-- [x] `tailwind.config.js` + `postcss.config.js`
-- [x] `.gitignore`
+## ✅ Phase 15: Timeline & Templates (DONE — 2026-05-01)
 
----
+### TodayScreen.tsx — Timeline View
+- [x] Toggle between **☰ List** and **📅 Timeline** views (T key)
+- [x] Visual 6 AM–11 PM timeline with 72px/hour grid
+- [x] Half-hour dashed guidelines
+- [x] **Red "now" line** that updates every 30s, auto-scrolls to current time
+- [x] Tasks rendered as colored blocks (height = duration)
+- [x] Task block hover → quick ✓ complete and ↷ skip buttons
+- [x] Active task shown with pulse dot on block
+- [x] Click any empty hour slot → opens Add Task modal pre-filled to that hour
+- [x] Completed tasks rendered greyed out with strikethrough
 
-## ✅ Phase 3: Electron Main Process (DONE)
-**`src/main/index.ts`** — BrowserWindow + Tray + 20+ IPC handlers
-- IPC: tasks (getAll, getForDate, getInRange, getRecentUnresolved, insert, update, delete)
-- IPC: focus (start, end, getActive, getTodayMinutes, logOverride)
-- IPC: stats (getStreak, getBestStreak, getAllTimeFocusMins, getAllTimeSessions, getRecentDayCompletions, recordDayCompletion, getTodayOverrides)
-- IPC: app (getVersion, showNotification, exportBackup, importBackup)
-- IPC: window (minimize, maximize, close)
-- System tray with context menu + minimize-to-tray
+### TodayScreen.tsx — Task Templates
+- [x] "Quick Templates" row in Add Task modal
+- [x] 6 presets: 🧠 Deep Work (90m, high), 📧 Email (30m, med), 📅 Meeting (60m, med), 💪 Exercise (45m, low), ☕ Break (15m, low), 📖 Learning (60m, high)
+- [x] One click pre-fills title, duration, priority, color, tags
 
-**`src/main/database.ts`** — better-sqlite3 SQLite (WAL mode)
-- Tables: tasks, settings, focus_sessions, focus_overrides, daily_completions
-- All CRUD + streak/completion/override analytics
+### TodayScreen.tsx — Live Focus Timer Chip
+- [x] When focus session is active, header shows live `🛡 MM:SS` elapsed timer
+- [x] Shows hours when session exceeds 1h (H:MM:SS)
+- [x] Styled as indigo chip with green pulse dot
 
----
-
-## ✅ Phase 4: Preload & Types (DONE)
-- [x] `src/preload/index.ts` — contextBridge exposing window.api (no nodeIntegration)
-- [x] `src/renderer/src/data/types.ts` — Task, AppSettings, UserProfile, FocusSession, BlockedWebsite, RecurringBlockSchedule, Reminder
-- [x] `src/renderer/src/env.d.ts` — Global window.api TypeScript declaration
-
----
-
-## ✅ Phase 5: React Renderer (DONE)
-- [x] `src/renderer/index.html` — Inter font, CSP headers
-- [x] `src/renderer/src/main.tsx` — ReactDOM + dayjs plugins
-- [x] `src/renderer/src/index.css` — Tailwind + custom animations (pulse-ring, spin-slow, fade-in, slide-up, ripple)
-- [x] `src/renderer/src/styles/theme.ts` — COLORS, TASK_COLORS
-
----
-
-## ✅ Phase 6: Global State (DONE)
-**`src/renderer/src/context/AppContext.tsx`**
-- useReducer (tasks, settings, focusSession, isDbReady)
-- All task actions: add, update, delete, complete, skip, extend
-- Focus: startFocusMode, stopFocusMode
-- Auto dark-mode class toggle
-- 60s background refresh + daily completion recording
-- 5-min pre-task notification scheduling
-
----
-
-## ✅ Phase 7: App Shell (DONE)
-**`src/renderer/src/App.tsx`**
-- Custom TitleBar (minimize/maximize/close buttons, drag region)
-- Sidebar (Today, Focus, Stats, Settings, Active, Reports, Profile)
-- Loading skeleton while DB initializes
-- Onboarding gate (shows wizard on first launch)
-- StreakChip in sidebar
-
----
-
-## ✅ Phase 8: All Screens (DONE — 1717 lines total)
-
-### TodayScreen.tsx (344 lines)
-- [x] Color-coded task cards with status icons
-- [x] Priority badges + tag chips
-- [x] Active/awaiting banner (live task with 1-tap actions)
-- [x] Add Task modal (title, desc, datetime, duration, priority, color picker, tags, focus toggle)
-- [x] Edit Task modal (same fields + delete button)
-- [x] Extend modal (+15/30/45/60/90 min options)
-- [x] Empty state with CTA
-
-### FocusScreen.tsx (180 lines)
-- [x] SVG ring timer (progress arc, countdown MM:SS, % done)
-- [x] Animated ripple rings during focus mode
-- [x] Slow-spin animation on ring during focus
-- [x] Time's-up prompt (Done/Extend/Skip)
-- [x] Emergency override button (logs to DB)
-- [x] No-task empty state with upcoming task preview
-
-### StatsScreen.tsx (283 lines)
-- [x] 4 filter tabs: Today / Yesterday / Week / All Time
-- [x] Focus time hero card with smart motivational copy
-- [x] Task breakdown with animated progress bars
-- [x] 7-day bar chart
-- [x] 12-week activity heatmap (gradient: grey→light indigo→indigo→dark indigo)
-- [x] 6 milestone badges (1h/10h focus, 10/100 sessions, 7d/30d streak) with earned/locked state
-
-### SettingsScreen.tsx (239 lines)
-- [x] Profile shortcut row (name + occupation)
-- [x] Dark mode toggle
-- [x] Default task duration selector (30/45/60/90/120m chips)
-- [x] Focus mode options (auto-enable, keep-until-task-end)
-- [x] Pomodoro (toggle + duration/break sliders)
-- [x] Notification + weekly report toggles
-- [x] Blocked Websites modal (PC-adapted app blocker)
-- [x] Keyword Blocker modal with quick presets
-- [x] Backup export to JSON, Reports shortcut
-- [x] Danger zone: Clear All Tasks
-
-### ProfileScreen.tsx (153 lines)
-- [x] Name input
-- [x] Occupation chips (Student/Professional/Freelancer/Creator/Other)
-- [x] Daily goal slider (1–12h)
-- [x] Wake-up time chips
-- [x] Sleep time chips
-- [x] Chronotype selector (6 options)
-- [x] Focus goals multi-select (8 options)
-- [x] Distraction triggers multi-select (8 options)
-- [x] Motivation style multi-select (4 options)
-
-### ReportsScreen.tsx (210 lines)
-- [x] Range tabs: Today / Yesterday / Week / All Time
-- [x] Focus time hero with motivational feedback (emoji + message)
-- [x] Override count warning card
-- [x] Task breakdown (completed/remaining/skipped bars + rate)
-- [x] Weekly 7-day bar chart
-- [x] All-time stats grid (focus hours, sessions, best streak, longest task)
-
-### ActiveScreen.tsx (141 lines)
-- [x] Focus session card (live task, pulse indicator, stop button)
-- [x] Today's stats (focus time, completion %, override count)
-- [x] Enforcement layers list (Focus, Websites, Keywords, Pomodoro) with ON/OFF badges
-- [x] Quick action grid (Today/Focus/Reports/Settings)
-
-### OnboardingScreen.tsx (167 lines)
-- [x] 5-step wizard with gradient hero header
-- [x] Step progress bars
-- [x] Welcome screen (feature list)
-- [x] Name + occupation chips
-- [x] Focus goals multi-select (validation: must pick ≥1)
-- [x] Daily goal slider
-- [x] Welcome summary with profile recap
-
----
-
-## ✅ Phase 9: Build Tooling & CI (DONE)
-- [x] `build/icon.png` — 512×512 indigo app icon
-- [x] `build/tray-icon.png` — 64×64 system tray icon
-- [x] `.github/workflows/build.yml`
-  - Trigger: push to `main`, PRs, version tags (`v*`)
-  - Job `build-windows`: windows-latest → npm ci → build → package:win → upload .exe artifact
-  - Job `release`: runs on `v*` tags, creates GitHub Release with .exe attached
-- [x] `README.md` — Full docs (features, tech stack, dev guide, project structure)
-
----
-
-## ✅ Phase 10: Build Verification (DONE)
-- [x] `npm install --ignore-scripts` → 436 packages, 0 errors
-- [x] `npx electron-vite build` → ALL PASSED
-  - Main: 3 modules → `out/main/index.js` (19.76 kB) ✓
-  - Preload: 1 module → `out/preload/index.js` (2.47 kB) ✓
-  - Renderer: 50 modules → `out/renderer/` (375 kB JS + 36 kB CSS) ✓
-- [x] Fixed apostrophe syntax error in OnboardingScreen.tsx (line 23)
+### App Shell — keyboard shortcuts updated
+- [x] `T` key toggles List ↔ Timeline view on Today screen
 
 ---
 
 ## 🔴 Phase 11: GitHub Push (BLOCKED — TOKEN EXPIRED)
 
 **Problem:** `GITHUB_PERSONAL_ACCESS_TOKEN` returns HTTP 401 "Bad credentials"  
-**Root cause:** Token was revoked or expired on GitHub  
+**Token seen:** prefix `ghp_IXpNM3` (40 chars) — this token is revoked/expired on GitHub.
 
-**Fix required:**
-1. Go to https://github.com/settings/tokens/new (classic)
-2. Name: `focusflow-pc-deploy`
-3. Expiration: 90 days (or No expiration)
-4. Scopes: ✅ `repo` (all), ✅ `workflow`
-5. Click "Generate token" → copy the `ghp_xxx` value
-6. In Replit: Secrets → update `GITHUB_PERSONAL_ACCESS_TOKEN` → paste new token
-7. Tell the agent to continue
+**SOLUTION — Use the Push UI page:**
+1. In Replit preview pane → select **"API Server"** from the dropdown
+2. Navigate to **/push** in the URL
+3. On that page: click the link to generate a new GitHub token
+   - Go to: https://github.com/settings/tokens/new
+   - Note: `focusflow-pc-push`
+   - Expiry: 90 days
+   - Scopes: ✅ `repo` (all) + ✅ `workflow`
+   - Click "Generate token" → copy the `ghp_…` value
+4. Paste token into the field and click **"Push 36 files to GitHub"**
+5. Watch the live log of file uploads
+6. Click the repo link when done
 
-**What happens when token is valid:**
-- [ ] Create GitHub repo `TITANICBHAI/focusflow-pc` via API
-- [ ] Upload all 33 source files via GitHub Contents API
-- [ ] Verify repo at https://github.com/TITANICBHAI/focusflow-pc
-- [ ] Confirm `.github/workflows/build.yml` is visible in Actions tab
-- [ ] Confirm Actions build auto-triggers on push
+**What the push does:**
+- Creates `TITANICBHAI/focusflow-pc` repo via GitHub API
+- Uploads all 36 source files via GitHub Contents API
+- GitHub Actions triggers automatically → builds Windows `.exe`
 
 ---
 
 ## 🔲 Phase 12: CI Verification (TODO)
 - [ ] Check GitHub Actions tab — `build-windows` job starts automatically
 - [ ] Job: Node 20 setup → npm ci → electron-vite build → electron-builder --win
-- [ ] .exe artifact uploaded (available in Actions run summary)
-- [ ] Tag `v1.0.0` → verify Release job creates GitHub Release with .exe
-- [ ] Download .exe and confirm it installs on Windows
+- [ ] `.exe` artifact uploaded (available in Actions run summary)
+- [ ] Tag `v1.0.0` → verify Release job creates GitHub Release with `.exe`
 
 ---
 
-## All 33 Project Files
+## All 36 Project Files
 ```
-.github/workflows/build.yml      ← GitHub Actions (Windows .exe build)
+.github/workflows/build.yml          ← GitHub Actions (Windows .exe build)
 .gitignore
-build/icon.png                   ← 512×512 app icon
-build/tray-icon.png              ← 64×64 system tray icon
+build/icon.png                       ← 512×512 app icon
+build/tray-icon.png                  ← 64×64 system tray icon
 electron.vite.config.ts
 package.json
 package-lock.json
 postcss.config.js
-push-to-github.sh                ← Manual push helper script
 README.md
-src/main/database.ts             ← SQLite (better-sqlite3, WAL)
-src/main/index.ts                ← Electron main + IPC + Tray
-src/preload/index.ts             ← contextBridge API
+PLAN.md                              ← This file
+src/main/database.ts                 ← SQLite (better-sqlite3, WAL) + notes + recurring
+src/main/index.ts                    ← Electron main + IPC + Tray + global shortcuts
+src/preload/index.ts                 ← contextBridge API (tasks/focus/stats/notes/app/window)
 src/renderer/index.html
-src/renderer/src/App.tsx         ← Shell + sidebar + TitleBar
+src/renderer/src/App.tsx             ← Shell + sidebar (Today/Week/Focus/Stats/Settings) + shortcuts
 src/renderer/src/context/AppContext.tsx
 src/renderer/src/data/types.ts
 src/renderer/src/env.d.ts
 src/renderer/src/index.css
 src/renderer/src/main.tsx
 src/renderer/src/screens/ActiveScreen.tsx
-src/renderer/src/screens/FocusScreen.tsx
+src/renderer/src/screens/FocusScreen.tsx    ← Pomodoro timer + Web Audio + skip + settings
+src/renderer/src/screens/NotesScreen.tsx    ← Daily journal + auto-save + history
 src/renderer/src/screens/OnboardingScreen.tsx
 src/renderer/src/screens/ProfileScreen.tsx
 src/renderer/src/screens/ReportsScreen.tsx
 src/renderer/src/screens/SettingsScreen.tsx
 src/renderer/src/screens/StatsScreen.tsx
-src/renderer/src/screens/TodayScreen.tsx
+src/renderer/src/screens/TodayScreen.tsx    ← List+Timeline views + search + templates + focus chip
+src/renderer/src/screens/WeekScreen.tsx     ← 7-day grid + per-day add + completion bars
 src/renderer/src/services/taskService.ts
 src/renderer/src/styles/theme.ts
 tailwind.config.js
@@ -270,67 +175,3 @@ tsconfig.json
 tsconfig.node.json
 tsconfig.web.json
 ```
-
----
-
-## Quick Reference: How to Push When Token is Ready
-
-**Option A — Automated (run inside Replit shell):**
-```bash
-node /tmp/push-to-github.mjs
-```
-
-**Option B — Manual (local terminal):**
-```bash
-cd /home/runner/workspace/focusflow-pc
-GITHUB_TOKEN=ghp_YOUR_TOKEN bash push-to-github.sh
-```
-
----
-
-## ✅ Phase 13: Polish & Feature Additions (DONE — 2026-05-01)
-
-### New in this pass:
-
-**Main Process (`src/main/index.ts`)**
-- [x] `globalShortcut` — 5 global system hotkeys registered:
-  - `Ctrl+Shift+Space` — Show/Hide window from anywhere on desktop
-  - `Ctrl+Shift+1` — Jump to Today tab
-  - `Ctrl+Shift+2` — Jump to Focus tab
-  - `Ctrl+Shift+3` — Jump to Stats tab
-  - `Ctrl+Shift+4` — Jump to Settings tab
-- [x] `globalShortcut.unregisterAll()` on `will-quit` (no leftover shortcuts)
-- [x] `window:isMaximized` IPC handler added for TitleBar maximize toggle
-- [x] Notification `icon` + click handler (clicking notification shows window)
-- [x] Tray menu includes named shortcuts: "Today (Ctrl+Shift+1)"
-- [x] `showAndNavigate()` helper sends `navigate` IPC event to renderer
-- [x] `backgroundColor: '#f9fafb'` on BrowserWindow (no white flash on load)
-- [x] `spellcheck: false` (not needed in a task manager)
-
-**Preload (`src/preload/index.ts`)**
-- [x] `window.api.on(channel, listener)` — listen for main→renderer IPC events
-- [x] `window.api.off(channel, listener)` — clean up listeners
-- [x] `window.api.window.isMaximized()` — sync maximize button state
-- [x] `showNotification` accepts optional `urgency: 'normal' | 'critical'`
-
-**App Shell (`src/renderer/src/App.tsx`)**
-- [x] TitleBar changes color to indigo when Focus Mode is active
-- [x] Focus mode top banner (green pulse + "stay on track!" message)
-- [x] Keyboard shortcut numbers (1–4) shown on hover in sidebar
-- [x] `useEffect` subscribes to `navigate` IPC events (global shortcuts work)
-- [x] In-window keyboard shortcuts: `1/2/3/4` navigate tabs, `?` opens help
-- [x] Keyboard Shortcut Help modal (full list, animated, click-outside closes)
-- [x] "?" button at bottom of sidebar to open shortcut help
-- [x] Maximize button shows ❐/□ based on `isMaximized()` state
-
-**CSS (`src/renderer/src/index.css`)**
-- [x] `slide-in-right`, `bounce-in`, `focus-pulse`, `shimmer` animations
-- [x] `.skeleton` shimmer class for loading states
-- [x] `kbd` element styled (shortcut chips)
-- [x] `-webkit-user-select: none` globally (desktop feel, inputs exempt)
-- [x] Better scrollbar hover state
-
-**Build verification:** ✅
-- Main: 21.17kB (was 19.76kB — +6.6% for global shortcuts)
-- Preload: 2.79kB (was 2.47kB — +13% for IPC helpers)
-- Renderer: 50 modules, 0 errors (unchanged module count)
