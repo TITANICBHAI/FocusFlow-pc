@@ -6,7 +6,7 @@ import type { Task } from '../data/types'
 import dayjs from 'dayjs'
 
 type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active'
-type ViewMode = 'list' | 'timeline'
+type ViewMode = 'list' | 'timeline' | 'week'
 type FilterStatus = 'all' | 'active' | 'scheduled' | 'completed' | 'skipped'
 
 interface Props { navigate: (p: Page) => void }
@@ -523,6 +523,169 @@ function ExtendModal({ taskId, onClose, onExtend }: { taskId: string; onClose: (
   )
 }
 
+// ── Week View ─────────────────────────────────────────────────────────────────
+const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const STATUS_DOT: Record<string, string> = {
+  completed: 'bg-green-400', skipped: 'bg-gray-300 dark:bg-gray-600',
+  active: 'bg-indigo-400 animate-pulse', scheduled: 'bg-blue-300 dark:bg-blue-500',
+  overdue: 'bg-orange-400',
+}
+
+function WeekView({ onEditTask, onAddAt }: {
+  onEditTask: (t: Task) => void
+  onAddAt: (iso: string) => void
+}) {
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [weekTasks, setWeekTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const todayStr = dayjs().format('YYYY-MM-DD')
+
+  // Compute week boundaries (Mon–Sun)
+  const weekStart = dayjs().startOf('week').add(weekOffset, 'week')
+  const weekEnd = weekStart.add(6, 'day').endOf('day')
+  const days = Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day'))
+
+  useEffect(() => {
+    setLoading(true)
+    window.api.tasks.getInRange(weekStart.toISOString(), weekEnd.toISOString())
+      .then((tasks: Task[]) => { setWeekTasks(tasks); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [weekOffset])
+
+  const tasksByDay = useMemo(() => {
+    const map: Record<string, Task[]> = {}
+    days.forEach(d => { map[d.format('YYYY-MM-DD')] = [] })
+    weekTasks.forEach(t => {
+      const key = dayjs(t.startTime).format('YYYY-MM-DD')
+      if (map[key]) map[key].push(t)
+    })
+    Object.values(map).forEach(arr => arr.sort((a, b) =>
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    ))
+    return map
+  }, [weekTasks, weekOffset])
+
+  const weekLabel = weekOffset === 0 ? 'This Week' :
+    weekOffset === -1 ? 'Last Week' :
+    weekOffset === 1 ? 'Next Week' :
+    `${weekStart.format('MMM D')} – ${weekEnd.format('MMM D')}`
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Week nav */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <button onClick={() => setWeekOffset(v => v - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors font-bold text-sm">‹</button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{weekLabel}</span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">{weekStart.format('MMM D')} – {weekEnd.format('MMM D, YYYY')}</span>
+          {weekOffset !== 0 && (
+            <button onClick={() => setWeekOffset(0)}
+              className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+              Today
+            </button>
+          )}
+        </div>
+        <button onClick={() => setWeekOffset(v => v + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors font-bold text-sm">›</button>
+      </div>
+
+      {/* 7-column grid */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex h-full min-w-[700px]">
+          {days.map(day => {
+            const key = day.format('YYYY-MM-DD')
+            const isToday = key === todayStr
+            const isPast = day.isBefore(dayjs(), 'day')
+            const tasks = tasksByDay[key] ?? []
+            const done = tasks.filter(t => t.status === 'completed').length
+            const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0
+
+            return (
+              <div key={key} className={`flex flex-col flex-1 border-r last:border-r-0 border-gray-200 dark:border-gray-700 min-w-0 ${
+                isToday ? 'bg-indigo-50/60 dark:bg-indigo-900/10' : isPast ? 'bg-gray-50/50 dark:bg-gray-900/30' : ''
+              }`}>
+                {/* Day header */}
+                <div className={`px-2 py-2 border-b text-center shrink-0 ${
+                  isToday ? 'border-indigo-300 dark:border-indigo-700' : 'border-gray-200 dark:border-gray-700'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-widest ${
+                    isToday ? 'text-indigo-500' : isPast ? 'text-gray-400 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400'
+                  }`}>{WEEK_DAYS[day.day()]}</div>
+                  <div className={`text-lg font-black leading-none mt-0.5 ${
+                    isToday ? 'text-indigo-600 dark:text-indigo-400' : isPast ? 'text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-200'
+                  }`}>{day.format('D')}</div>
+                  {tasks.length > 0 && (
+                    <div className="flex items-center gap-1 justify-center mt-1">
+                      <div className="w-10 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: isToday ? '#6366f1' : '#10b981' }} />
+                      </div>
+                      <span className={`text-[9px] font-bold ${isToday ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}>{done}/{tasks.length}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Task list */}
+                <div className="flex-1 overflow-y-auto px-1.5 py-1.5 space-y-1">
+                  {loading ? (
+                    <div className="flex justify-center pt-4">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : tasks.length === 0 ? (
+                    <button
+                      onClick={() => onAddAt(day.hour(9).minute(0).toISOString())}
+                      className="w-full mt-2 py-2 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-[10px] text-gray-300 dark:text-gray-600 hover:border-indigo-300 hover:text-indigo-400 dark:hover:border-indigo-700 dark:hover:text-indigo-500 transition-colors"
+                    >+ add</button>
+                  ) : (
+                    <>
+                      {tasks.map(task => (
+                        <button
+                          key={task.id}
+                          onClick={() => onEditTask(task)}
+                          className={`w-full text-left px-1.5 py-1 rounded-lg border transition-all hover:shadow-sm group ${
+                            task.status === 'completed'
+                              ? 'border-green-200 dark:border-green-900/40 bg-green-50/50 dark:bg-green-900/10 opacity-60'
+                              : task.status === 'skipped'
+                              ? 'border-gray-200 dark:border-gray-700 opacity-50'
+                              : isToday && task.status === 'active'
+                              ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700'
+                          }`}
+                        >
+                          <div className="flex items-start gap-1">
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${STATUS_DOT[task.status] ?? 'bg-gray-300'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-[10px] font-bold leading-tight truncate ${
+                                task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'
+                              }`}>{task.title}</div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <div className="w-1 h-3.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
+                                <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{dayjs(task.startTime).format('h:mm A')}</span>
+                                <span className="text-[9px] text-gray-300 dark:text-gray-600">{task.durationMinutes}m</span>
+                                {task.repeatRule && task.repeatRule !== 'none' && (
+                                  <span className="text-[8px] text-violet-400">🔁</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => onAddAt(day.hour(12).minute(0).toISOString())}
+                        className="w-full py-1 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-[9px] text-gray-300 dark:text-gray-600 hover:border-indigo-300 hover:text-indigo-400 dark:hover:border-indigo-700 dark:hover:text-indigo-500 transition-colors"
+                      >+</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── FocusTimer chip for header ─────────────────────────────────────────────────
 function FocusTimerChip({ startedAt }: { startedAt: string }) {
   const [elapsed, setElapsed] = useState(0)
@@ -590,7 +753,9 @@ export default function TodayScreen({ navigate }: Props) {
       if (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable) return
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setAddDefaultTime(undefined); setShowAdd(true) }
       if (e.key === '/' || e.key === 'f' || e.key === 'F') { e.preventDefault(); document.getElementById('task-search')?.focus() }
-      if (e.key === 't' || e.key === 'T') setViewMode(v => v === 'list' ? 'timeline' : 'list')
+      if (e.key === '1') setViewMode('list')
+      if (e.key === '2') setViewMode('timeline')
+      if (e.key === '3') setViewMode('week')
       if (e.key === 'Escape') { setSearch(''); setFilterStatus('all') }
     }
     window.addEventListener('keydown', onKey)
@@ -639,17 +804,24 @@ export default function TodayScreen({ navigate }: Props) {
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => setViewMode('list')}
-                title="List view (T)"
+                title="List view (1)"
                 className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
               >
                 ☰ List
               </button>
               <button
                 onClick={() => setViewMode('timeline')}
-                title="Timeline view (T)"
+                title="Timeline view (2)"
                 className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${viewMode === 'timeline' ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
               >
                 📅 Timeline
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                title="Week view (3)"
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${viewMode === 'week' ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+              >
+                🗓 Week
               </button>
             </div>
             <button
@@ -689,7 +861,10 @@ export default function TodayScreen({ navigate }: Props) {
         )}
 
         {viewMode === 'timeline' && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Hover an hour slot to add a task · Click a task to edit · <kbd className="text-[10px]">T</kbd> to toggle view</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Hover an hour slot to add a task · Click a task to edit · <kbd className="text-[10px]">1</kbd> List <kbd className="text-[10px]">2</kbd> Timeline <kbd className="text-[10px]">3</kbd> Week</p>
+        )}
+        {viewMode === 'week' && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">Click a task to edit · Click <strong>+</strong> to add · ‹ › to navigate weeks · <kbd className="text-[10px]">1</kbd> List <kbd className="text-[10px]">2</kbd> Timeline</p>
         )}
       </div>
 
@@ -714,7 +889,12 @@ export default function TodayScreen({ navigate }: Props) {
 
       {/* Content area */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === 'timeline' ? (
+        {viewMode === 'week' ? (
+          <WeekView
+            onEditTask={setEditTask}
+            onAddAt={openAddAt}
+          />
+        ) : viewMode === 'timeline' ? (
           <TimelineView
             tasks={todayTasks}
             onComplete={handleComplete}
