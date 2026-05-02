@@ -92,4 +92,6 @@ export interface AppSettings {
   weeklyReportEnabled: boolean
   aversionSoundEnabled: boolean
   tipsCardDismissed?: boolean
+  dailySummaryEnabled?: boolean
+  dailySummaryTime?: string
 }

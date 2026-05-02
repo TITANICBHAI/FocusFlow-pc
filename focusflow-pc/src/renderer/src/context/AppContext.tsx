@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   recurringBlockSchedules: [], keepFocusActiveUntilTaskEnd: false,
   blockedWebsites: [], blockedWebsitesEnabled: false, weeklyReportEnabled: false,
   aversionSoundEnabled: false, tipsCardDismissed: false,
+  dailySummaryEnabled: true, dailySummaryTime: '18:00',
 }
 
 function reducer(state: AppState, action: Action): AppState {

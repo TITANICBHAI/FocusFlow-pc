@@ -207,6 +207,26 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
           <Row label="Enable Notifications" desc="Task reminders and focus alerts">
             <Toggle value={settings.notificationsEnabled} onChange={v => update({ notificationsEnabled: v })} />
           </Row>
+          <Row label="Daily Summary" desc="End-of-day recap — tasks done, focus time, streak">
+            <Toggle value={settings.dailySummaryEnabled ?? true} onChange={v => update({ dailySummaryEnabled: v })} />
+          </Row>
+          {(settings.dailySummaryEnabled ?? true) && (
+            <Row label="Summary Time" desc="When to receive your daily recap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={settings.dailySummaryTime ?? '18:00'}
+                  onChange={e => update({ dailySummaryTime: e.target.value })}
+                  className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-1.5 outline-none focus:border-indigo-500 transition-colors"
+                />
+                <button
+                  onClick={() => window.api.app.triggerDailySummary()}
+                  title="Send a preview notification right now"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 transition-colors whitespace-nowrap"
+                >Preview</button>
+              </div>
+            </Row>
+          )}
           <Row label="Weekly Report" desc="Sunday summary of your week">
             <Toggle value={settings.weeklyReportEnabled ?? false} onChange={v => update({ weeklyReportEnabled: v })} />
           </Row>

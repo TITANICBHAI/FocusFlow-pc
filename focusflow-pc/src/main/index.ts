@@ -113,6 +113,97 @@ function registerGlobalShortcuts(): void {
   })
 }
 
+// ── Daily Summary Scheduler ───────────────────────────────────────────────────
+let lastSummaryDate = ''
+
+function startDailySummaryScheduler(): void {
+  setInterval(() => {
+    try {
+      const settings = getSettings() as {
+        dailySummaryEnabled?: boolean
+        dailySummaryTime?: string
+        notificationsEnabled?: boolean
+      }
+      if (!settings.notificationsEnabled) return
+      if (!(settings.dailySummaryEnabled ?? true)) return
+
+      const summaryTime = settings.dailySummaryTime ?? '18:00'
+      const [targetH, targetM] = summaryTime.split(':').map(Number)
+      const now = new Date()
+      const todayKey = now.toISOString().slice(0, 10)
+
+      if (now.getHours() !== targetH || now.getMinutes() !== targetM) return
+      if (lastSummaryDate === todayKey) return
+      lastSummaryDate = todayKey
+
+      // Gather today's stats from DB
+      const allTasks = getAllTasks()
+      const todayStr = todayKey
+      const todayTasks = allTasks.filter(t => {
+        const d = new Date(t.startTime)
+        return d.toISOString().slice(0, 10) === todayStr
+      })
+      const done = todayTasks.filter((t: { status: string }) => t.status === 'completed').length
+      const total = todayTasks.length
+      const focusMins = getTodayFocusMinutes() as number
+      const streak = getStreak() as number
+
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0
+      const focusHours = focusMins >= 60 ? `${(focusMins / 60).toFixed(1)}h` : `${focusMins}m`
+
+      let emoji = '📊'
+      let headline = "Here's your day at a glance"
+      if (pct >= 100) { emoji = '🏆'; headline = 'Perfect day — everything done!' }
+      else if (pct >= 80) { emoji = '🎯'; headline = 'Fantastic effort today!' }
+      else if (pct >= 50) { emoji = '💪'; headline = 'Solid progress today!' }
+      else if (pct > 0)   { emoji = '🌱'; headline = 'Every step counts — keep going!' }
+      else                { emoji = '☀️'; headline = "Tomorrow's a fresh start!" }
+
+      const streakLine = streak > 0 ? ` · 🔥 ${streak}-day streak` : ''
+      const body = total > 0
+        ? `${emoji} ${done}/${total} tasks (${pct}%)  ·  ⏱ ${focusHours} focus${streakLine}`
+        : `⏱ ${focusHours} focus today${streakLine} — no tasks scheduled`
+
+      const n = new Notification({
+        title: `FocusFlow Daily Summary — ${headline}`,
+        body,
+        icon: join(__dirname, '../../build/icon.png'),
+        urgency: 'normal',
+        timeoutType: 'default',
+      })
+      n.on('click', () => { mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('navigate', 'stats') })
+      n.show()
+    } catch {
+      // silently ignore scheduler errors
+    }
+  }, 60_000)
+}
+
+ipcMain.handle('app:triggerDailySummary', () => {
+  try {
+    const allTasks = getAllTasks()
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayTasks = allTasks.filter((t: { startTime: string }) => new Date(t.startTime).toISOString().slice(0, 10) === todayStr)
+    const done = todayTasks.filter((t: { status: string }) => t.status === 'completed').length
+    const total = todayTasks.length
+    const focusMins = getTodayFocusMinutes() as number
+    const streak = getStreak() as number
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0
+    const focusHours = focusMins >= 60 ? `${(focusMins / 60).toFixed(1)}h` : `${focusMins}m`
+    const streakLine = streak > 0 ? ` · 🔥 ${streak}-day streak` : ''
+    const body = total > 0
+      ? `✅ ${done}/${total} tasks (${pct}%)  ·  ⏱ ${focusHours} focus${streakLine}`
+      : `⏱ ${focusHours} focus today${streakLine}`
+    const n = new Notification({
+      title: 'FocusFlow — Daily Summary (Preview)',
+      body,
+      icon: join(__dirname, '../../build/icon.png'),
+    })
+    n.on('click', () => { mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('navigate', 'stats') })
+    n.show()
+  } catch { /* ignore */ }
+})
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.tbtechs.focusflow')
   app.on('browser-window-created', (_, window) => { optimizer.watchShortcuts(window) })
@@ -122,6 +213,7 @@ app.whenReady().then(() => {
   createWindow()
   createTray()
   registerGlobalShortcuts()
+  startDailySummaryScheduler()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

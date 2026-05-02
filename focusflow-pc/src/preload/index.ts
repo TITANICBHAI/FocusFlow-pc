@@ -40,6 +40,7 @@ const api = {
     showNotification: (title: string, body: string, urgency?: 'normal' | 'critical') => ipcRenderer.invoke('app:showNotification', title, body, urgency),
     exportBackup: (data: string) => ipcRenderer.invoke('app:exportBackup', data),
     importBackup: (path: string) => ipcRenderer.invoke('app:importBackup', path),
+    triggerDailySummary: () => ipcRenderer.invoke('app:triggerDailySummary'),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
