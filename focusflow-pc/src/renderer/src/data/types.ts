@@ -15,6 +15,7 @@ export interface Task {
   color: string
   focusMode: boolean
   focusAllowedPackages?: string[]
+  repeatRule?: string
   createdAt: string
   updatedAt: string
 }

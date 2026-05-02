@@ -12,7 +12,8 @@ function genId(): string {
 
 export function createTask(data: {
   title: string; description?: string; startTime: string; durationMinutes: number
-  priority?: TaskPriority; tags?: string[]; color?: string; focusMode?: boolean; focusAllowedPackages?: string[]
+  priority?: TaskPriority; tags?: string[]; color?: string; focusMode?: boolean
+  focusAllowedPackages?: string[]; repeatRule?: string; repeat?: string
 }): Task {
   const start = dayjs(data.startTime)
   const end = start.add(data.durationMinutes, 'minute')
@@ -30,6 +31,7 @@ export function createTask(data: {
     color: data.color ?? '#6366f1',
     focusMode: data.focusMode ?? false,
     focusAllowedPackages: data.focusAllowedPackages,
+    repeatRule: data.repeatRule ?? data.repeat ?? 'none',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

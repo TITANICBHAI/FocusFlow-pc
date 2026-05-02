@@ -56,6 +56,7 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
   const [duration, setDuration] = useState(30)
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
   const [tags, setTags] = useState('')
+  const [repeat, setRepeat] = useState('none')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
@@ -71,7 +72,7 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
       const startTime = dayjs(`${date}T${time}`).toISOString()
       const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
       const color = PRIORITY_OPTIONS.find(p => p.value === priority)?.color ?? '#6366f1'
-      await addTask({ title: trimmed, startTime, durationMinutes: duration, priority, tags: tagList, color })
+      await addTask({ title: trimmed, startTime, durationMinutes: duration, priority, tags: tagList, color, repeatRule: repeat })
       onClose()
     } catch {
       setError('Failed to add task — please try again.')
@@ -209,6 +210,35 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
               onChange={e => setTags(e.target.value)}
               className="w-full text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition-colors placeholder-gray-300 dark:placeholder-gray-600"
             />
+          </div>
+
+          {/* Repeat */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">
+              Repeat 🔁
+            </label>
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { value: 'none', label: 'None' },
+                { value: 'daily', label: 'Daily' },
+                { value: 'weekdays', label: 'Weekdays' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'monthly', label: 'Monthly' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setRepeat(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    repeat === opt.value
+                      ? 'bg-violet-500 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Actions */}

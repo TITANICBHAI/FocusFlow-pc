@@ -215,6 +215,7 @@ function scheduleNextRecurrence(task: Record<string, unknown>, repeat: string): 
 }
 
 export function updateTask(task: Record<string, unknown>): void {
+  const repeatRule = (task.repeatRule ?? 'none') as string
   db.prepare(
     `UPDATE tasks SET title=?,description=?,start_time=?,end_time=?,duration_minutes=?,status=?,priority=?,tags=?,reminders=?,color=?,focus_mode=?,focus_allowed_packages=?,repeat_rule=?,updated_at=? WHERE id=?`
   ).run(
@@ -223,9 +224,13 @@ export function updateTask(task: Record<string, unknown>): void {
     JSON.stringify(task.tags ?? []), JSON.stringify(task.reminders ?? []),
     task.color, task.focusMode ? 1 : 0,
     task.focusAllowedPackages !== undefined ? JSON.stringify(task.focusAllowedPackages) : null,
-    task.repeatRule ?? 'none',
+    repeatRule,
     task.updatedAt, task.id
   )
+  // On completion of a recurring task, ensure the next occurrence exists
+  if (task.status === 'completed' && repeatRule && repeatRule !== 'none') {
+    scheduleNextRecurrence(task, repeatRule)
+  }
 }
 
 export function deleteTask(id: string): void {

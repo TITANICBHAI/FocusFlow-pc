@@ -199,6 +199,10 @@ function TimelineView({
 }
 
 // ── Task Card (List view) ─────────────────────────────────────────────────────
+const REPEAT_LABEL: Record<string, string> = {
+  daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', monthly: 'Monthly'
+}
+
 function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: {
   task: Task
   onComplete: (id: string) => void
@@ -210,6 +214,7 @@ function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: 
   const isActive = task.status !== 'completed' && task.status !== 'skipped' &&
     new Date(task.startTime) <= new Date() && new Date(task.endTime) >= new Date()
   const awaiting = isAwaitingDecision(task)
+  const hasRepeat = task.repeatRule && task.repeatRule !== 'none'
 
   return (
     <div className={`group relative bg-white dark:bg-gray-800 rounded-2xl border transition-all hover:shadow-md animate-fade-in ${
@@ -225,6 +230,11 @@ function TaskCard({ task, onComplete, onSkip, onExtend, onStartFocus, onEdit }: 
             <span className={`text-sm font-bold truncate ${task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}`}>
               {task.title}
             </span>
+            {hasRepeat && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 shrink-0">
+                🔁 {REPEAT_LABEL[task.repeatRule!] ?? task.repeatRule}
+              </span>
+            )}
             <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLOR[task.priority] + '20', color: PRIORITY_COLOR[task.priority] }}>
               {task.priority}
             </span>
@@ -417,12 +427,13 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
   const [color, setColor] = useState(task.color)
   const [tags, setTags] = useState(task.tags.join(', '))
   const [focusMode, setFocusMode] = useState(task.focusMode)
+  const [repeatRule, setRepeatRule] = useState(task.repeatRule ?? 'none')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const start = new Date(startTime)
     const end = new Date(start.getTime() + duration * 60000)
-    onSave({ ...task, title: title.trim(), description: description.trim() || undefined, startTime: start.toISOString(), endTime: end.toISOString(), durationMinutes: duration, priority: priority as Task['priority'], color, tags: tags.split(',').map(t => t.trim()).filter(Boolean), focusMode, updatedAt: new Date().toISOString() })
+    onSave({ ...task, title: title.trim(), description: description.trim() || undefined, startTime: start.toISOString(), endTime: end.toISOString(), durationMinutes: duration, priority: priority as Task['priority'], color, tags: tags.split(',').map(t => t.trim()).filter(Boolean), focusMode, repeatRule, updatedAt: new Date().toISOString() })
     onClose()
   }
 
@@ -463,6 +474,17 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
             </div>
           </div>
           <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Tags: work, study" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Repeat 🔁</label>
+            <select value={repeatRule} onChange={e => setRepeatRule(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value="none">No repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekdays">Weekdays (Mon–Fri)</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
           <label className="flex items-center gap-3 cursor-pointer">
             <div className={`relative w-10 h-5 rounded-full transition-colors ${focusMode ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`} onClick={() => setFocusMode(v => !v)}>
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${focusMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
@@ -472,7 +494,9 @@ function EditTaskModal({ task, onClose, onSave, onDelete }: { task: Task; onClos
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => { if (confirm('Delete this task?')) { onDelete(task.id); onClose() } }} className="px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-800 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete</button>
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors">Save</button>
+            <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition-colors">
+              Save {repeatRule !== 'none' ? `(${REPEAT_LABEL[repeatRule] ?? repeatRule})` : ''}
+            </button>
           </div>
         </form>
       </div>
