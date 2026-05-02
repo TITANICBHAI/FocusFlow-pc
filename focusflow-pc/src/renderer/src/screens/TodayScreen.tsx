@@ -531,9 +531,10 @@ const STATUS_DOT: Record<string, string> = {
   overdue: 'bg-orange-400',
 }
 
-function WeekView({ onEditTask, onAddAt }: {
+function WeekView({ onEditTask, onAddAt, taskKey }: {
   onEditTask: (t: Task) => void
   onAddAt: (iso: string) => void
+  taskKey: number
 }) {
   const [weekOffset, setWeekOffset] = useState(0)
   const [weekTasks, setWeekTasks] = useState<Task[]>([])
@@ -553,7 +554,9 @@ function WeekView({ onEditTask, onAddAt }: {
     window.api.tasks.getInRange(weekStart.toISOString(), weekEnd.toISOString())
       .then((tasks: Task[]) => { setWeekTasks(tasks); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [weekOffset])
+  // taskKey changes whenever any task is added/updated/deleted outside WeekView
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset, taskKey])
 
   const tasksByDay = useMemo(() => {
     const map: Record<string, Task[]> = {}
@@ -853,6 +856,12 @@ export default function TodayScreen({ navigate }: Props) {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
+  // Stable key that changes whenever any task is added / edited / deleted
+  const taskKey = useMemo(() =>
+    state.tasks.reduce((max, t) => Math.max(max, new Date(t.updatedAt).getTime()), state.tasks.length),
+    [state.tasks]
+  )
+
   const completed = todayTasks.filter(t => t.status === 'completed').length
   const skipped  = todayTasks.filter(t => t.status === 'skipped').length
   const bannerTask = activeTask ?? (todayTasks.find(t => isAwaitingDecision(t)) ?? null)
@@ -1028,6 +1037,7 @@ export default function TodayScreen({ navigate }: Props) {
           <WeekView
             onEditTask={setEditTask}
             onAddAt={openAddAt}
+            taskKey={taskKey}
           />
         ) : viewMode === 'timeline' ? (
           <TimelineView

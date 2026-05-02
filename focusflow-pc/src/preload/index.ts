@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// Map original listener → wrapped listener so off() can deregister properly
+const _wrapperMap = new Map<
+  (...args: unknown[]) => void,
+  (event: Electron.IpcRendererEvent, ...args: unknown[]) => void
+>()
+
 const api = {
   tasks: {
     getAll: () => ipcRenderer.invoke('tasks:getAll'),
@@ -57,10 +63,16 @@ const api = {
     stop: () => ipcRenderer.invoke('overlay:stop'),
   },
   on: (channel: string, listener: (...args: unknown[]) => void) => {
-    ipcRenderer.on(channel, (_event, ...args) => listener(...args))
+    const wrapper = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => listener(...args)
+    _wrapperMap.set(listener, wrapper)
+    ipcRenderer.on(channel, wrapper)
   },
   off: (channel: string, listener: (...args: unknown[]) => void) => {
-    ipcRenderer.off(channel, (_event, ...args) => listener(...args))
+    const wrapper = _wrapperMap.get(listener)
+    if (wrapper) {
+      ipcRenderer.off(channel, wrapper)
+      _wrapperMap.delete(listener)
+    }
   },
 }
 
