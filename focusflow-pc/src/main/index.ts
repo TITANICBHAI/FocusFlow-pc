@@ -74,6 +74,7 @@ function createTray(): void {
 
   const buildMenu = () => Menu.buildFromTemplate([
     { label: 'Open FocusFlow', click: () => { mainWindow?.show(); mainWindow?.focus() } },
+    { label: '+ Quick Add Task (Ctrl+Shift+N)', click: () => { mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('quickAdd:open') } },
     { type: 'separator' },
     { label: 'Today (Ctrl+Shift+1)', click: () => { showAndNavigate('today') } },
     { label: 'Week (Ctrl+Shift+2)', click: () => { showAndNavigate('week') } },
@@ -104,6 +105,12 @@ function registerGlobalShortcuts(): void {
   globalShortcut.register('CommandOrControl+Shift+2', () => showAndNavigate('week'))
   globalShortcut.register('CommandOrControl+Shift+3', () => showAndNavigate('focus'))
   globalShortcut.register('CommandOrControl+Shift+4', () => showAndNavigate('stats'))
+
+  globalShortcut.register('CommandOrControl+Shift+N', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+    mainWindow?.webContents.send('quickAdd:open')
+  })
 }
 
 app.whenReady().then(() => {
