@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings, BlockedWebsite, RecurringBlockSchedule } from '../data/types'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist' | 'overlay-appearance' | 'allowed-in-focus'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -445,6 +445,68 @@ export default function BlockDefenseScreen({ navigate }: { navigate: (p: Page) =
             onChange={v => update({ aversionSoundEnabled: v })}
             disabled={focusActive && (settings.aversionSoundEnabled ?? false)}
           />
+        </Section>
+
+        {/* ── Overlay Appearance ───────────────────────────────── */}
+        <Section
+          icon="🎨"
+          title="Overlay Appearance"
+          description={`Customize the block screen — color theme, custom quotes, and display options. Theme: ${(settings.overlayTheme ?? 'dark').charAt(0).toUpperCase() + (settings.overlayTheme ?? 'dark').slice(1)}.`}
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Customize Overlay</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {(settings.overlayQuotes ?? []).length > 0
+                  ? `${(settings.overlayQuotes ?? []).length} custom quote${(settings.overlayQuotes ?? []).length !== 1 ? 's' : ''} · ${(settings.overlayTheme ?? 'dark')} theme`
+                  : 'Built-in quotes · ' + (settings.overlayTheme ?? 'dark') + ' theme'}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('overlay-appearance')}
+              className="px-3 py-1.5 rounded-xl bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-600 transition-colors"
+            >
+              Customize →
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Allowed in Focus ─────────────────────────────────── */}
+        <Section
+          icon="🔓"
+          title="Allowed in Focus"
+          description="Domains that bypass the block rules while a focus session is active — for work tools you genuinely need."
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Manage Allowlist</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {(settings.allowedInFocus ?? []).length > 0
+                  ? `${(settings.allowedInFocus ?? []).length} domain${(settings.allowedInFocus ?? []).length !== 1 ? 's' : ''} exempted during focus sessions`
+                  : 'No exceptions — all blocked sites stay blocked during focus'}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('allowed-in-focus')}
+              className="px-3 py-1.5 rounded-xl bg-green-500 text-white text-xs font-bold hover:bg-green-600 transition-colors"
+            >
+              Manage →
+            </button>
+          </div>
+          {(settings.allowedInFocus ?? []).length > 0 && (
+            <div className="px-4 pb-3">
+              <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                {(settings.allowedInFocus ?? []).slice(0, 10).map(d => (
+                  <span key={d} className="px-2 py-0.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-xs font-semibold text-green-600 dark:text-green-400">
+                    {d}
+                  </span>
+                ))}
+                {(settings.allowedInFocus ?? []).length > 10 && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">+{(settings.allowedInFocus ?? []).length - 10} more</span>
+                )}
+              </div>
+            </div>
+          )}
         </Section>
 
       </div>

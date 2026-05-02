@@ -98,6 +98,9 @@ export interface AppSettings {
   tipsCardDismissed?: boolean
   sessionPin?: string | null        // SHA-256 hex of 4–6 digit PIN; null = no PIN set
   showBlockedSitesList?: boolean    // show domains in block overlay (default true)
+  // Overlay appearance
+  overlayQuotes?: string[]          // custom motivational quotes shown on block overlay
+  overlayTheme?: 'dark' | 'midnight' | 'forest' | 'ocean' | 'sunset'
   // Daily Allowance
   dailyAllowances?: DailyAllowanceEntry[]
   dailyAllowanceUsage?: DailyAllowanceUsage[]

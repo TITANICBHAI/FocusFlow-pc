@@ -21,6 +21,8 @@ import ImportBlocklistScreen from './screens/ImportBlocklistScreen'
 import AchievementModal from './components/AchievementModal'
 import DailyAllowanceScreen from './screens/DailyAllowanceScreen'
 import WeeklyReportScreen from './screens/WeeklyReportScreen'
+import OverlayAppearanceScreen from './screens/OverlayAppearanceScreen'
+import AllowedInFocusScreen from './screens/AllowedInFocusScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
 export type Page =
@@ -39,6 +41,8 @@ export type Page =
   | 'import-blocklist'
   | 'daily-allowance'
   | 'weekly-report'
+  | 'overlay-appearance'
+  | 'allowed-in-focus'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -49,7 +53,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = 
 ]
 
 // Pages grouped under "block-defense" for active highlight
-const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on', 'standalone-block', 'import-blocklist']
+const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on', 'standalone-block', 'import-blocklist', 'overlay-appearance', 'allowed-in-focus']
 
 function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   const [isMax, setIsMax] = useState(false)
@@ -291,8 +295,10 @@ function AppShell() {
           {page === 'privacy'          && <PrivacyScreen navigate={navigate} />}
           {page === 'standalone-block' && <StandaloneBlockScreen navigate={navigate} />}
           {page === 'import-blocklist' && <ImportBlocklistScreen navigate={navigate} />}
-          {page === 'daily-allowance' && <DailyAllowanceScreen navigate={navigate} />}
-          {page === 'weekly-report'  && <WeeklyReportScreen navigate={navigate} />}
+          {page === 'daily-allowance'     && <DailyAllowanceScreen navigate={navigate} />}
+          {page === 'weekly-report'       && <WeeklyReportScreen navigate={navigate} />}
+          {page === 'overlay-appearance'  && <OverlayAppearanceScreen navigate={navigate} />}
+          {page === 'allowed-in-focus'    && <AllowedInFocusScreen navigate={navigate} />}
         </main>
       </div>
 
