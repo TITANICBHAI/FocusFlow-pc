@@ -98,4 +98,24 @@ export interface AppSettings {
   tipsCardDismissed?: boolean
   sessionPin?: string | null        // SHA-256 hex of 4–6 digit PIN; null = no PIN set
   showBlockedSitesList?: boolean    // show domains in block overlay (default true)
+  // Daily Allowance
+  dailyAllowances?: DailyAllowanceEntry[]
+  dailyAllowanceUsage?: DailyAllowanceUsage[]
+}
+
+export interface DailyAllowanceEntry {
+  id: string
+  domain: string
+  mode: 'time_budget' | 'interval'
+  budgetMinutes: number      // for time_budget: total minutes allowed per day
+  intervalMinutes: number    // for interval: allowed duration each visit
+  intervalHours: number      // for interval: minimum hours between visits
+  enabled: boolean
+}
+
+export interface DailyAllowanceUsage {
+  id: string                 // allowance entry id
+  date: string               // YYYY-MM-DD
+  usedMinutes: number
+  lastStarted: string | null // ISO timestamp of current active visit start
 }

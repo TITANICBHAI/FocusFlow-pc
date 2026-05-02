@@ -18,6 +18,9 @@ import HowToUseScreen from './screens/HowToUseScreen'
 import PrivacyScreen from './screens/PrivacyScreen'
 import StandaloneBlockScreen from './screens/StandaloneBlockScreen'
 import ImportBlocklistScreen from './screens/ImportBlocklistScreen'
+import AchievementModal from './components/AchievementModal'
+import DailyAllowanceScreen from './screens/DailyAllowanceScreen'
+import WeeklyReportScreen from './screens/WeeklyReportScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
 export type Page =
@@ -34,6 +37,8 @@ export type Page =
   | 'how-to-use'
   | 'privacy'
   | 'import-blocklist'
+  | 'daily-allowance'
+  | 'weekly-report'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -98,11 +103,14 @@ function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   )
 }
 
+const STREAK_MILESTONES = [3, 7, 14, 30, 60, 90, 180, 365]
+
 function AppShell() {
-  const { state } = useApp()
+  const { state, updateSettings } = useApp()
   const [page, setPage] = useState<Page>('today')
   const [activeTab, setActiveTab] = useState<Tab>('today')
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [pendingMilestone, setPendingMilestone] = useState<number | null>(null)
   const isFocusing = !!state.focusSession
 
   const navigate = useCallback((p: Page) => {
@@ -136,6 +144,20 @@ function AppShell() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [navigate])
+
+  // Streak milestone celebration
+  useEffect(() => {
+    if (!state.isDbReady) return
+    const checkStreak = async () => {
+      try {
+        const streak = await window.api.stats.getStreak()
+        const lastShown = state.settings.lastShownStreakMilestone ?? 0
+        const nextMilestone = STREAK_MILESTONES.filter(m => m <= streak && m > lastShown).pop()
+        if (nextMilestone) setPendingMilestone(nextMilestone)
+      } catch { /* ignore */ }
+    }
+    checkStreak()
+  }, [state.isDbReady])
 
   if (!state.isDbReady) {
     return (
@@ -217,6 +239,8 @@ function AppShell() {
               { id: 'standalone-block' as Page,  label: 'Standalone Block', icon: '⏱' },
               { id: 'block-defense' as Page,     label: 'Block Defense',    icon: '🛡' },
               { id: 'import-blocklist' as Page,  label: 'Import Blocklist', icon: '📥' },
+              { id: 'daily-allowance' as Page,   label: 'Daily Allowance',  icon: '⏳' },
+              { id: 'weekly-report' as Page,     label: 'Weekly Report',    icon: '📊' },
               { id: 'reports' as Page,           label: 'Reports',          icon: '📋' },
               { id: 'profile' as Page,           label: 'Profile',          icon: '👤' },
             ]).map(item => (
@@ -267,6 +291,8 @@ function AppShell() {
           {page === 'privacy'          && <PrivacyScreen navigate={navigate} />}
           {page === 'standalone-block' && <StandaloneBlockScreen navigate={navigate} />}
           {page === 'import-blocklist' && <ImportBlocklistScreen navigate={navigate} />}
+          {page === 'daily-allowance' && <DailyAllowanceScreen navigate={navigate} />}
+          {page === 'weekly-report'  && <WeeklyReportScreen navigate={navigate} />}
         </main>
       </div>
 
@@ -318,6 +344,16 @@ function AppShell() {
             </button>
           </div>
         </div>
+      )}
+
+      {pendingMilestone !== null && (
+        <AchievementModal
+          milestone={pendingMilestone}
+          onDismiss={() => {
+            updateSettings({ ...state.settings, lastShownStreakMilestone: pendingMilestone })
+            setPendingMilestone(null)
+          }}
+        />
       )}
     </div>
   )

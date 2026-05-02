@@ -403,145 +403,170 @@ export default function StatsScreen() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Stats</h1>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Your focus & productivity overview</p>
+      {/* Header + filter tabs */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Stats</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Your focus & productivity overview</p>
+        </div>
+        <div className="flex gap-2">
+          {FILTER_TABS.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${filter === f ? 'bg-indigo-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+              {f === 'alltime' ? 'All Time' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        {FILTER_TABS.map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${filter === f ? 'bg-indigo-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
-            {f === 'alltime' ? 'All Time' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* Two-column body */}
+      <div className="flex flex-1 overflow-hidden">
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {/* LEFT — primary metrics */}
+        <div className="w-1/2 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4">
 
-        {/* ── TODAY ── */}
-        {filter === 'today' && (
-          <>
-            {/* Focus ring */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 animate-fade-in">
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-400 dark:text-indigo-500 mb-4">Focus Time</p>
-              {focusMinutes > 0 ? (
-                <FocusRing minutes={focusMinutes} goalMinutes={dailyGoalMins} />
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-3xl mb-2">🎯</p>
-                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">No focus sessions yet today</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start a task in Focus mode to track time</p>
-                </div>
-              )}
-            </div>
-
-            {/* Productivity Score */}
-            <ProductivityScore
-              completionRate={todayRate}
-              focusMinutes={focusMinutes}
-              goalMinutes={dailyGoalMins}
-              overrides={overrideCount}
-              streak={streak}
-            />
-
-            {/* Task stats grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Tasks Done" value={`${todayDone}/${todayTotal}`} icon="✅" color={todayRate >= 70 ? '#10b981' : todayRate >= 40 ? '#f59e0b' : '#ef4444'} />
-              <StatCard label="Completion" value={`${todayRate}%`} icon="📈" color={todayRate >= 70 ? '#10b981' : todayRate >= 40 ? '#f59e0b' : '#ef4444'} />
-            </div>
-
-            {/* Task breakdown */}
-            {todayTotal > 0 && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">Task Breakdown</p>
-                {[
-                  { label: 'Completed', value: todayTasks.filter(t => t.status === 'completed').length, color: '#10b981' },
-                  { label: 'Remaining', value: todayTasks.filter(t => t.status === 'scheduled').length, color: '#6366f1' },
-                  { label: 'Skipped', value: todayTasks.filter(t => t.status === 'skipped').length, color: '#9ca3af' },
-                  { label: 'Overdue', value: todayTasks.filter(t => t.status === 'overdue').length, color: '#ef4444' },
-                ].filter(r => r.value > 0).map(r => (
-                  <div key={r.label} className="flex items-center gap-3 mb-2">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 w-20">{r.label}</span>
-                    <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ backgroundColor: r.color, width: `${(r.value / todayTotal) * 100}%` }} />
-                    </div>
-                    <span className="text-xs font-bold w-4 text-right" style={{ color: r.color }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tag breakdown */}
-            <TagBreakdown tasks={todayTasks} />
-          </>
-        )}
-
-        {/* ── YESTERDAY ── */}
-        {filter === 'yesterday' && (() => {
-          const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
-          const comp = completions.find(c => c.date === yesterday)
-          const rate = comp && comp.total > 0 ? Math.round((comp.completed / comp.total) * 100) : 0
-          const rateColor = rate >= 70 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444'
-          return (
+          {/* ── TODAY left ── */}
+          {filter === 'today' && (
             <>
-              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 text-center animate-fade-in">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">{dayjs().subtract(1,'day').format('dddd, MMM D')}</p>
-                <p className="text-6xl font-black" style={{ color: rateColor }}>{rate}%</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{comp?.completed ?? 0}/{comp?.total ?? 0} tasks completed</p>
-                <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mt-3">
-                  <div className="h-full rounded-full transition-all" style={{ backgroundColor: rateColor, width: `${rate}%` }} />
-                </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 animate-fade-in">
+                <p className="text-xs font-bold uppercase tracking-wider text-indigo-400 dark:text-indigo-500 mb-4">Focus Time</p>
+                {focusMinutes > 0 ? (
+                  <FocusRing minutes={focusMinutes} goalMinutes={dailyGoalMins} />
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-3xl mb-2">🎯</p>
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">No focus sessions yet today</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start a task in Focus mode to track time</p>
+                  </div>
+                )}
               </div>
-              {!comp ? (
-                <div className="text-center text-gray-400 dark:text-gray-500 text-sm py-8">No tasks recorded yesterday</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Done" value={comp.completed} icon="✅" color="#10b981" />
-                  <StatCard label="Total" value={comp.total} icon="📋" color="#6366f1" />
+              <ProductivityScore
+                completionRate={todayRate}
+                focusMinutes={focusMinutes}
+                goalMinutes={dailyGoalMins}
+                overrides={overrideCount}
+                streak={streak}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="Tasks Done" value={`${todayDone}/${todayTotal}`} icon="✅" color={todayRate >= 70 ? '#10b981' : todayRate >= 40 ? '#f59e0b' : '#ef4444'} />
+                <StatCard label="Completion" value={`${todayRate}%`} icon="📈" color={todayRate >= 70 ? '#10b981' : todayRate >= 40 ? '#f59e0b' : '#ef4444'} />
+                <StatCard label="Streak" value={`${streak}d`} icon="🔥" color={streak > 0 ? '#f97316' : '#9ca3af'} />
+                <StatCard label="Overrides" value={overrideCount} icon="🚫" color={overrideCount === 0 ? '#10b981' : '#ef4444'} />
+              </div>
+            </>
+          )}
+
+          {/* ── YESTERDAY left ── */}
+          {filter === 'yesterday' && (() => {
+            const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
+            const comp = completions.find(c => c.date === yesterday)
+            const rate = comp && comp.total > 0 ? Math.round((comp.completed / comp.total) * 100) : 0
+            const rateColor = rate >= 70 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444'
+            return (
+              <>
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 text-center animate-fade-in">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">{dayjs().subtract(1,'day').format('dddd, MMM D')}</p>
+                  <p className="text-6xl font-black" style={{ color: rateColor }}>{rate}%</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{comp?.completed ?? 0}/{comp?.total ?? 0} tasks completed</p>
+                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mt-3">
+                    <div className="h-full rounded-full transition-all" style={{ backgroundColor: rateColor, width: `${rate}%` }} />
+                  </div>
+                </div>
+                {comp && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <StatCard label="Done" value={comp.completed} icon="✅" color="#10b981" />
+                    <StatCard label="Total" value={comp.total} icon="📋" color="#6366f1" />
+                  </div>
+                )}
+              </>
+            )
+          })()}
+
+          {/* ── WEEK left ── */}
+          {filter === 'week' && (
+            <>
+              <WeeklyComparison completions={completions} />
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Tasks Completed — Last 7 Days</p>
+                <BarChart data={weekDays} maxVal={maxWeek} color="#6366f1" />
+              </div>
+            </>
+          )}
+
+          {/* ── ALL TIME left ── */}
+          {filter === 'alltime' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="Focus Hours" value={`${Math.floor(allTimeMins/60)}h`} icon="⏱" color="#6366f1"
+                  sub={allTimeMins > 0 ? `${allTimeMins % 60}m total` : undefined} />
+                <StatCard label="Sessions" value={allTimeSessions} icon="🎯" color="#10b981"
+                  sub={allTimeSessions > 0 ? 'focus sessions' : undefined} />
+                <StatCard label="Best Streak" value={`${bestStreak}d`} icon="🏆" color="#f59e0b" />
+                <StatCard label="Current Streak" value={`${streak}d`} icon="🔥" color={streak > 0 ? '#f97316' : '#9ca3af'} />
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">Milestones</p>
+                <Milestones allTimeMins={allTimeMins} allTimeSessions={allTimeSessions} streak={streak} />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* RIGHT — charts & breakdowns */}
+        <div className="w-1/2 overflow-y-auto p-4 space-y-4">
+
+          {filter === 'today' && (
+            <>
+              {todayTotal > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">Task Breakdown</p>
+                  {[
+                    { label: 'Completed', value: todayTasks.filter(t => t.status === 'completed').length, color: '#10b981' },
+                    { label: 'Remaining', value: todayTasks.filter(t => t.status === 'scheduled').length, color: '#6366f1' },
+                    { label: 'Skipped', value: todayTasks.filter(t => t.status === 'skipped').length, color: '#9ca3af' },
+                    { label: 'Overdue', value: todayTasks.filter(t => t.status === 'overdue').length, color: '#ef4444' },
+                  ].filter(r => r.value > 0).map(r => (
+                    <div key={r.label} className="flex items-center gap-3 mb-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 w-20">{r.label}</span>
+                      <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ backgroundColor: r.color, width: `${(r.value / todayTotal) * 100}%` }} />
+                      </div>
+                      <span className="text-xs font-bold w-4 text-right" style={{ color: r.color }}>{r.value}</span>
+                    </div>
+                  ))}
                 </div>
               )}
-              <WeeklyComparison completions={completions} />
+              <TagBreakdown tasks={todayTasks} />
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                <Heatmap completions={completions} />
+              </div>
             </>
-          )
-        })()}
+          )}
 
-        {/* ── WEEK ── */}
-        {filter === 'week' && (
-          <>
-            <WeeklyComparison completions={completions} />
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Tasks Completed — Last 7 Days</p>
-              <BarChart data={weekDays} maxVal={maxWeek} color="#6366f1" />
-            </div>
+          {filter === 'yesterday' && (
+            <>
+              <WeeklyComparison completions={completions} />
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                <Heatmap completions={completions} />
+              </div>
+            </>
+          )}
+
+          {filter === 'week' && (
+            <>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
+                <Heatmap completions={completions} />
+              </div>
+              <TagBreakdown tasks={todayTasks} />
+            </>
+          )}
+
+          {filter === 'alltime' && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
               <Heatmap completions={completions} />
             </div>
-          </>
-        )}
-
-        {/* ── ALL TIME ── */}
-        {filter === 'alltime' && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Focus Hours" value={`${Math.floor(allTimeMins/60)}h`} icon="⏱" color="#6366f1"
-                sub={allTimeMins > 0 ? `${allTimeMins % 60}m total` : undefined} />
-              <StatCard label="Sessions" value={allTimeSessions} icon="🎯" color="#10b981"
-                sub={allTimeSessions > 0 ? 'focus sessions' : undefined} />
-              <StatCard label="Best Streak" value={`${bestStreak}d`} icon="🏆" color="#f59e0b" />
-              <StatCard label="Current Streak" value={`${streak}d`} icon="🔥" color={streak > 0 ? '#f97316' : '#9ca3af'} />
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">Milestones</p>
-              <Milestones allTimeMins={allTimeMins} allTimeSessions={allTimeSessions} streak={streak} />
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
-              <Heatmap completions={completions} />
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
