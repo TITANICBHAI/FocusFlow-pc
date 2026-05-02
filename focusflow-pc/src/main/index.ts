@@ -8,7 +8,7 @@ import {
   getAllTimeFocusMinutes, getAllTimeFocusSessions, getRecentDayCompletions,
   backfillDayCompletions, recordDayCompletion, getTodayOverrideCount,
   logFocusOverride, getTasksInDateRange, getRecentUnresolvedTasks,
-  getNoteForDate, saveNote, getRecentNoteDates
+  getNoteForDate, saveNote, getRecentNoteDates, getFocusHistory
 } from './database'
 import { readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
@@ -261,6 +261,7 @@ ipcMain.handle('stats:getAllTimeSessions', () => getAllTimeFocusSessions())
 ipcMain.handle('stats:getRecentDayCompletions', (_, days: number) => getRecentDayCompletions(days))
 ipcMain.handle('stats:recordDayCompletion', (_, completed: number, total: number) => { recordDayCompletion(completed, total); return true })
 ipcMain.handle('stats:getTodayOverrides', () => getTodayOverrideCount())
+ipcMain.handle('stats:getFocusHistory', (_, days: number) => getFocusHistory(days))
 
 // ── Notes ───────────────────────────────────────────────────────────────────
 ipcMain.handle('notes:get', (_, date: string) => getNoteForDate(date))

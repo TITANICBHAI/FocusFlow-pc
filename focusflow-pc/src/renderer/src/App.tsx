@@ -10,10 +10,11 @@ import ReportsScreen from './screens/ReportsScreen'
 import ActiveScreen from './screens/ActiveScreen'
 import NotesScreen from './screens/NotesScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import FocusHistoryScreen from './screens/FocusHistoryScreen'
 import dayjs from 'dayjs'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
-type Page = Tab | 'profile' | 'reports' | 'active' | 'notes'
+type Page = Tab | 'profile' | 'reports' | 'active' | 'notes' | 'focusHistory'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -423,6 +424,7 @@ function AppShell() {
             </div>
             {([
               { id: 'notes' as Page, label: 'Daily Notes', icon: '📝' },
+              { id: 'focusHistory' as Page, label: 'Focus History', icon: '🕐' },
               { id: 'active' as Page, label: 'Active Status', icon: '⚡' },
               { id: 'reports' as Page, label: 'Reports', icon: '📋' },
               { id: 'profile' as Page, label: 'Profile', icon: '👤' },
@@ -477,8 +479,9 @@ function AppShell() {
           {page === 'settings' && <SettingsScreen navigate={navigate} />}
           {page === 'profile'  && <ProfileScreen onBack={() => navigate('settings')} />}
           {page === 'reports'  && <ReportsScreen onBack={() => navigate('stats')} />}
-          {page === 'active'   && <ActiveScreen navigate={navigate} />}
-          {page === 'notes'    && <NotesScreen />}
+          {page === 'active'       && <ActiveScreen navigate={navigate} />}
+          {page === 'notes'        && <NotesScreen />}
+          {page === 'focusHistory' && <FocusHistoryScreen onBack={() => navigate('stats')} />}
         </main>
       </div>
 

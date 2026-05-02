@@ -351,6 +351,57 @@ export function saveNote(date: string, content: string): void {
   db.prepare(`INSERT OR REPLACE INTO daily_notes (date,content,updated_at) VALUES (?,?,?)`).run(date, content, now)
 }
 
+// ── Focus History ─────────────────────────────────────────────────────────────
+
+export interface FocusHistoryEntry {
+  id: number
+  taskId: string
+  taskTitle: string
+  taskColor: string
+  taskPriority: string
+  startedAt: string
+  endedAt: string
+  durationMinutes: number
+  overrideCount: number
+}
+
+export function getFocusHistory(days = 90): FocusHistoryEntry[] {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  cutoff.setHours(0, 0, 0, 0)
+  const sessions = db.prepare(`
+    SELECT fs.id, fs.task_id, fs.started_at, fs.ended_at,
+           t.title, t.color, t.priority
+    FROM focus_sessions fs
+    LEFT JOIN tasks t ON t.id = fs.task_id
+    WHERE fs.is_active = 0 AND fs.ended_at IS NOT NULL
+      AND fs.started_at >= ?
+    ORDER BY fs.started_at DESC
+  `).all(cutoff.toISOString()) as {
+    id: number; task_id: string; started_at: string; ended_at: string;
+    title: string | null; color: string | null; priority: string | null
+  }[]
+
+  return sessions.map(s => {
+    const durMs = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()
+    const durMins = Math.max(0, Math.round(durMs / 60000))
+    const overrideRow = db.prepare(
+      `SELECT COUNT(*) as cnt FROM focus_overrides WHERE task_id=? AND overridden_at >= ? AND overridden_at <= ?`
+    ).get(s.task_id, s.started_at, s.ended_at) as { cnt: number }
+    return {
+      id: s.id,
+      taskId: s.task_id,
+      taskTitle: s.title ?? 'Unknown Task',
+      taskColor: s.color ?? '#6366f1',
+      taskPriority: s.priority ?? 'medium',
+      startedAt: s.started_at,
+      endedAt: s.ended_at,
+      durationMinutes: durMins,
+      overrideCount: overrideRow?.cnt ?? 0,
+    }
+  })
+}
+
 export function getRecentNoteDates(days: number): string[] {
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days + 1); cutoff.setHours(0,0,0,0)
   const cutoffStr = cutoff.toISOString().slice(0, 10)
