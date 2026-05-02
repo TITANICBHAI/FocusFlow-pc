@@ -14,7 +14,44 @@ import { readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 
 let mainWindow: BrowserWindow | null = null
+let overlayWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+
+function createOverlayWindow(): void {
+  const { screen } = require('electron')
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+
+  overlayWindow = new BrowserWindow({
+    width: 280,
+    height: 92,
+    x: width - 300,
+    y: height - 110,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+  overlayWindow.setAlwaysOnTop(true, 'floating')
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    const base = process.env['ELECTRON_RENDERER_URL']!.replace(/\/[^/]*\.html$/, '').replace(/\/$/, '')
+    overlayWindow.loadURL(`${base}/overlay.html`)
+  } else {
+    overlayWindow.loadFile(join(__dirname, '../renderer/overlay.html'))
+  }
+
+  overlayWindow.on('closed', () => { overlayWindow = null })
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -211,6 +248,7 @@ app.whenReady().then(() => {
   initDatabase()
   backfillDayCompletions(30)
   createWindow()
+  createOverlayWindow()
   createTray()
   registerGlobalShortcuts()
   startDailySummaryScheduler()
@@ -295,3 +333,24 @@ ipcMain.handle('window:minimize', () => mainWindow?.minimize())
 ipcMain.handle('window:maximize', () => { if (mainWindow?.isMaximized()) mainWindow.unmaximize(); else mainWindow?.maximize() })
 ipcMain.handle('window:close', () => mainWindow?.hide())
 ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)
+
+// ── Pomodoro Overlay IPC ──────────────────────────────────────────────────────
+ipcMain.handle('overlay:show', () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) createOverlayWindow()
+  overlayWindow?.showInactive()
+})
+ipcMain.handle('overlay:hide', () => {
+  overlayWindow?.hide()
+})
+ipcMain.handle('overlay:update', (_, state: unknown) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay:state', state)
+  }
+})
+// Relay skip/stop from overlay → main window renderer
+ipcMain.handle('overlay:skip', () => {
+  mainWindow?.webContents.send('overlay:skip')
+})
+ipcMain.handle('overlay:stop', () => {
+  mainWindow?.webContents.send('overlay:stop')
+})

@@ -233,7 +233,61 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
     task?.id ?? null, isFocusing && pomodoroEnabled, workMins, breakMins
   )
 
-  // Ctrl+S = save / quick-complete
+  // ── Overlay: show/hide with focus session ────────────────────────────────
+  useEffect(() => {
+    if (isFocusing && task) {
+      window.api.overlay.show()
+    } else {
+      window.api.overlay.hide()
+    }
+    return () => { window.api.overlay.hide() }
+  }, [isFocusing, task?.id])
+
+  // ── Overlay: stream timer state every second ──────────────────────────────
+  useEffect(() => {
+    if (!isFocusing || !task) return
+    let oRemMins = remMins
+    let oRemSecs = remSecs
+    let oProgress = progress
+    if (!pomodoroEnabled) {
+      // Non-Pomodoro: derive remaining from task end time
+      const nowMs = Date.now()
+      const endMs = new Date(task.endTime).getTime()
+      const startMs = new Date(task.startTime).getTime()
+      const remaining = Math.max(0, endMs - nowMs)
+      const total = Math.max(1, endMs - startMs)
+      oRemMins = Math.floor(remaining / 60000)
+      oRemSecs = Math.floor((remaining % 60000) / 1000)
+      oProgress = Math.min(1, (nowMs - startMs) / total)
+    }
+    const overlayState: Record<string, unknown> = {
+      visible: true,
+      phase: pomodoroEnabled ? pomo.phase : 'work',
+      interval: pomo.interval,
+      maxIntervals: MAX_INTERVALS,
+      remMins: oRemMins,
+      remSecs: oRemSecs,
+      progress: oProgress,
+      taskTitle: task.title,
+      color: task.color,
+      pomodoroMode: pomodoroEnabled,
+    }
+    window.api.overlay.update(overlayState)
+  }, [isFocusing, remMins, remSecs, progress, pomo.phase, pomo.interval, task?.id, pomodoroEnabled])
+
+  // ── Overlay: handle skip/stop commands relayed from overlay buttons ───────
+  useEffect(() => {
+    const onSkip = () => skipPhase()
+    const onStop = () => { if (confirm('End focus mode for this task?')) stopFocusMode() }
+    window.api.on('overlay:skip', onSkip)
+    window.api.on('overlay:stop', onStop)
+    return () => {
+      window.api.off('overlay:skip', onSkip)
+      window.api.off('overlay:stop', onStop)
+    }
+  }, [skipPhase, stopFocusMode])
+
+  // Ctrl+Enter = quick-complete
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && task && !awaiting) {

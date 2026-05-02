@@ -49,6 +49,13 @@ const api = {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   },
+  overlay: {
+    show: () => ipcRenderer.invoke('overlay:show'),
+    hide: () => ipcRenderer.invoke('overlay:hide'),
+    update: (state: unknown) => ipcRenderer.invoke('overlay:update', state),
+    skip: () => ipcRenderer.invoke('overlay:skip'),
+    stop: () => ipcRenderer.invoke('overlay:stop'),
+  },
   on: (channel: string, listener: (...args: unknown[]) => void) => {
     ipcRenderer.on(channel, (_event, ...args) => listener(...args))
   },
