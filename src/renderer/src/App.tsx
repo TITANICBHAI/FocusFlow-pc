@@ -12,9 +12,24 @@ import NotesScreen from './screens/NotesScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import BlockDefenseScreen from './screens/BlockDefenseScreen'
 import KeywordBlockerScreen from './screens/KeywordBlockerScreen'
+import AlwaysOnScreen from './screens/AlwaysOnScreen'
+import ChangelogScreen from './screens/ChangelogScreen'
+import HowToUseScreen from './screens/HowToUseScreen'
+import PrivacyScreen from './screens/PrivacyScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
-export type Page = Tab | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker'
+export type Page =
+  | Tab
+  | 'profile'
+  | 'reports'
+  | 'active'
+  | 'notes'
+  | 'block-defense'
+  | 'keyword-blocker'
+  | 'always-on'
+  | 'changelog'
+  | 'how-to-use'
+  | 'privacy'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -23,6 +38,9 @@ const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = 
   { id: 'stats',    label: 'Stats',    icon: '📊', shortcut: '4' },
   { id: 'settings', label: 'Settings', icon: '⚙️', shortcut: '5' },
 ]
+
+// Pages grouped under "block-defense" for active highlight
+const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on']
 
 function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   const [isMax, setIsMax] = useState(false)
@@ -88,14 +106,12 @@ function AppShell() {
     if (['today', 'week', 'focus', 'stats', 'settings'].includes(p)) setActiveTab(p as Tab)
   }, [])
 
-  // Listen for navigate events from main process (global shortcuts, tray)
   useEffect(() => {
     const handler = (p: unknown) => { if (typeof p === 'string') navigate(p as Page) }
     window.api.on('navigate', handler)
     return () => window.api.off('navigate', handler)
   }, [navigate])
 
-  // In-window keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
@@ -144,7 +160,6 @@ function AppShell() {
     <div className={`flex flex-col h-full bg-gray-50 dark:bg-gray-900 ${isFocusing ? 'focus-mode-active' : ''}`}>
       <TitleBar isFocusing={isFocusing} />
 
-      {/* Focus mode top banner */}
       {isFocusing && (
         <div className="bg-indigo-500 dark:bg-indigo-700 px-4 py-1.5 flex items-center gap-2 animate-fade-in">
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -169,7 +184,7 @@ function AppShell() {
                 onClick={() => navigate(item.id)}
                 title={`${item.label} (${item.shortcut})`}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
-                  activeTab === item.id && (page === item.id || (item.id === 'today' && page === 'today') || (item.id === 'week' && page === 'week'))
+                  activeTab === item.id
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
@@ -192,18 +207,18 @@ function AppShell() {
             <div className="px-3 mb-2">
               <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">More</div>
             </div>
-            {[
-              { id: 'notes' as Page, label: 'Daily Notes', icon: '📝' },
-              { id: 'active' as Page, label: 'Active Status', icon: '⚡' },
-              { id: 'block-defense' as Page, label: 'Block Defense', icon: '🛡' },
-              { id: 'reports' as Page, label: 'Reports', icon: '📋' },
-              { id: 'profile' as Page, label: 'Profile', icon: '👤' },
-            ].map(item => (
+            {([
+              { id: 'notes' as Page,        label: 'Daily Notes',    icon: '📝' },
+              { id: 'active' as Page,       label: 'Active Status',  icon: '⚡' },
+              { id: 'block-defense' as Page, label: 'Block Defense',  icon: '🛡' },
+              { id: 'reports' as Page,      label: 'Reports',        icon: '📋' },
+              { id: 'profile' as Page,      label: 'Profile',        icon: '👤' },
+            ]).map(item => (
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  page === item.id || (item.id === 'block-defense' && (page === 'block-defense' || page === 'keyword-blocker'))
+                  page === item.id || (item.id === 'block-defense' && BLOCK_PAGES.includes(page))
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
@@ -214,7 +229,6 @@ function AppShell() {
             ))}
           </div>
 
-          {/* Today progress + Streak + shortcut hint */}
           <div className="px-4 pt-3 space-y-2">
             <TodayProgressBar />
             <StreakChip />
@@ -230,21 +244,24 @@ function AppShell() {
 
         {/* Main content */}
         <main className="flex-1 overflow-hidden page-enter">
-          {page === 'today'          && <TodayScreen navigate={navigate} />}
-          {page === 'week'           && <WeekScreen navigate={navigate} />}
-          {page === 'focus'          && <FocusScreen navigate={navigate} />}
-          {page === 'stats'          && <StatsScreen />}
-          {page === 'settings'       && <SettingsScreen navigate={navigate} />}
-          {page === 'profile'        && <ProfileScreen onBack={() => navigate('settings')} />}
-          {page === 'reports'        && <ReportsScreen onBack={() => navigate('stats')} />}
-          {page === 'active'         && <ActiveScreen navigate={navigate} />}
-          {page === 'notes'          && <NotesScreen />}
-          {page === 'block-defense'  && <BlockDefenseScreen navigate={navigate} />}
+          {page === 'today'           && <TodayScreen navigate={navigate} />}
+          {page === 'week'            && <WeekScreen navigate={navigate} />}
+          {page === 'focus'           && <FocusScreen navigate={navigate} />}
+          {page === 'stats'           && <StatsScreen />}
+          {page === 'settings'        && <SettingsScreen navigate={navigate} />}
+          {page === 'profile'         && <ProfileScreen onBack={() => navigate('settings')} />}
+          {page === 'reports'         && <ReportsScreen onBack={() => navigate('stats')} />}
+          {page === 'active'          && <ActiveScreen navigate={navigate} />}
+          {page === 'notes'           && <NotesScreen />}
+          {page === 'block-defense'   && <BlockDefenseScreen navigate={navigate} />}
           {page === 'keyword-blocker' && <KeywordBlockerScreen navigate={navigate} />}
+          {page === 'always-on'       && <AlwaysOnScreen navigate={navigate} />}
+          {page === 'changelog'       && <ChangelogScreen navigate={navigate} />}
+          {page === 'how-to-use'      && <HowToUseScreen navigate={navigate} />}
+          {page === 'privacy'         && <PrivacyScreen navigate={navigate} />}
         </main>
       </div>
 
-      {/* Keyboard shortcut modal */}
       {showShortcuts && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"

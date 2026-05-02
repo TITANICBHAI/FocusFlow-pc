@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings, BlockedWebsite, RecurringBlockSchedule } from '../data/types'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -195,6 +195,7 @@ export default function BlockDefenseScreen({ navigate }: { navigate: (p: Page) =
   const keywordCount = settings.blockedWords?.length ?? 0
   const scheduleCount = settings.recurringBlockSchedules?.length ?? 0
   const activeScheduleCount = (settings.recurringBlockSchedules ?? []).filter(s => s.enabled).length
+  const alwaysOnCount = settings.alwaysOnPackages?.length ?? 0
 
   const update = (partial: Partial<AppSettings>) => updateSettings({ ...settings, ...partial })
 
@@ -346,6 +347,42 @@ export default function BlockDefenseScreen({ navigate }: { navigate: (p: Page) =
                   </span>
                 ))}
                 {keywordCount > 20 && <span className="text-xs text-gray-400 dark:text-gray-500">+{keywordCount - 20} more</span>}
+              </div>
+            </div>
+          )}
+        </Section>
+
+        {/* ── Always-On Block List ─────────────────────────────── */}
+        <Section
+          icon="♾️"
+          title="Always-On Block List"
+          description="Domains blocked 24/7 — no focus session or timer needed. Stays active until you remove them."
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Manage Always-On Domains</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {alwaysOnCount > 0
+                  ? `${alwaysOnCount} domain${alwaysOnCount !== 1 ? 's' : ''} blocked permanently`
+                  : 'No domains added — add sites to block them 24/7'}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('always-on')}
+              className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors"
+            >
+              Manage →
+            </button>
+          </div>
+          {alwaysOnCount > 0 && (
+            <div className="px-4 pb-3">
+              <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                {(settings.alwaysOnPackages ?? []).slice(0, 12).map(d => (
+                  <span key={d} className="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400">
+                    {d}
+                  </span>
+                ))}
+                {alwaysOnCount > 12 && <span className="text-xs text-gray-400 dark:text-gray-500">+{alwaysOnCount - 12} more</span>}
               </div>
             </div>
           )}

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { formatTime } from '../services/taskService'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -92,6 +92,17 @@ export default function ActiveScreen({ navigate }: { navigate: (p: Page) => void
         : schedules.length > 0 ? 'All schedules disabled' : 'No schedules configured',
       color: '#f59e0b',
       action: () => navigate('block-defense'),
+      actionLabel: 'Edit',
+    },
+    {
+      label: 'Always-On Block List',
+      on: (settings.alwaysOnEnforcementEnabled ?? false) && (settings.alwaysOnPackages?.length ?? 0) > 0,
+      icon: '♾️',
+      desc: (settings.alwaysOnPackages?.length ?? 0) > 0
+        ? `${settings.alwaysOnPackages?.length ?? 0} domain${(settings.alwaysOnPackages?.length ?? 0) !== 1 ? 's' : ''} blocked 24/7${settings.alwaysOnEnforcementEnabled ? '' : ' (enforcement off)'}`
+        : 'No domains added',
+      color: '#ef4444',
+      action: () => navigate('always-on'),
       actionLabel: 'Edit',
     },
     {

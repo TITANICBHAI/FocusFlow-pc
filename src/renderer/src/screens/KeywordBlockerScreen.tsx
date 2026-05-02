@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
 
 interface QuickPreset {
   id: string

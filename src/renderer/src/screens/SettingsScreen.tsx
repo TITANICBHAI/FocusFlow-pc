@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
 
-type Page = 'today' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -214,6 +214,7 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
 
         <Section title="Focus Enforcement (PC)">
           <BtnRow icon="🛡" label="Block Enforcement" desc="Websites, keywords, schedules & deterrents" onClick={() => navigate('block-defense')} />
+          <BtnRow icon="♾️" label="Always-On Block List" desc={`${settings.alwaysOnPackages?.length ?? 0} domain${(settings.alwaysOnPackages?.length ?? 0) !== 1 ? 's' : ''} blocked 24/7`} onClick={() => navigate('always-on')} />
           <BtnRow icon="🌐" label="Blocked Websites" desc={`${settings.blockedWebsites?.length ?? 0} site${(settings.blockedWebsites?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => setShowSites(true)} />
           <BtnRow icon="🔤" label="Keyword Blocker" desc={`${settings.blockedWords?.length ?? 0} keyword${(settings.blockedWords?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => navigate('keyword-blocker')} />
           <BtnRow icon="⏰" label="Block Schedules" desc={`${settings.recurringBlockSchedules?.length ?? 0} recurring schedule${(settings.recurringBlockSchedules?.length ?? 0) !== 1 ? 's' : ''}`} onClick={() => navigate('block-defense')} />
@@ -224,12 +225,18 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
           <BtnRow icon="📋" label="View Reports" desc="Detailed focus & productivity report" onClick={() => navigate('reports')} />
         </Section>
 
+        <Section title="Help & Info">
+          <BtnRow icon="📖" label="How to Use FocusFlow" desc="Quick guide to all features" onClick={() => navigate('how-to-use')} />
+          <BtnRow icon="🆕" label="What's New" desc="Version history and release notes" onClick={() => navigate('changelog')} />
+          <BtnRow icon="🔒" label="Privacy & Terms" desc="Local data only — no servers" onClick={() => navigate('privacy')} />
+        </Section>
+
         <Section title="Danger Zone">
           <BtnRow icon="🗑" label="Clear All Tasks" desc="Permanently delete all tasks" danger onClick={handleClearTasks} />
         </Section>
 
         <div className="text-center py-4">
-          <p className="text-xs text-gray-400 dark:text-gray-600">FocusFlow PC v1.0.0</p>
+          <p className="text-xs text-gray-400 dark:text-gray-600">FocusFlow PC v1.1.0</p>
           <p className="text-xs text-gray-300 dark:text-gray-700 mt-0.5">Built with ❤️ for deep work</p>
         </div>
       </div>
