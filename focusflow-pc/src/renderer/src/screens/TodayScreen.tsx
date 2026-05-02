@@ -538,9 +538,12 @@ function WeekView({ onEditTask, onAddAt }: {
   const [weekOffset, setWeekOffset] = useState(0)
   const [weekTasks, setWeekTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dropSuccess, setDropSuccess] = useState<string | null>(null)
+  const dragCountRef = useRef<Record<string, number>>({})
   const todayStr = dayjs().format('YYYY-MM-DD')
 
-  // Compute week boundaries (Mon–Sun)
   const weekStart = dayjs().startOf('week').add(weekOffset, 'week')
   const weekEnd = weekStart.add(6, 'day').endOf('day')
   const days = Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day'))
@@ -569,6 +572,84 @@ function WeekView({ onEditTask, onAddAt }: {
     weekOffset === -1 ? 'Last Week' :
     weekOffset === 1 ? 'Next Week' :
     `${weekStart.format('MMM D')} – ${weekEnd.format('MMM D')}`
+
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+  const handleDragStart = (e: React.DragEvent, task: Task) => {
+    e.dataTransfer.setData('taskId', task.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingId(task.id)
+    // Transparent ghost by default; browser renders its own
+  }
+
+  const handleDragEnd = () => {
+    setDraggingId(null)
+    setDragOverDay(null)
+    dragCountRef.current = {}
+  }
+
+  const handleDragEnter = (e: React.DragEvent, dayKey: string) => {
+    e.preventDefault()
+    dragCountRef.current[dayKey] = (dragCountRef.current[dayKey] ?? 0) + 1
+    setDragOverDay(dayKey)
+  }
+
+  const handleDragLeave = (_e: React.DragEvent, dayKey: string) => {
+    dragCountRef.current[dayKey] = (dragCountRef.current[dayKey] ?? 1) - 1
+    if (dragCountRef.current[dayKey] <= 0) {
+      dragCountRef.current[dayKey] = 0
+      setDragOverDay(prev => prev === dayKey ? null : prev)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetDayKey: string) => {
+    e.preventDefault()
+    setDragOverDay(null)
+    dragCountRef.current = {}
+
+    const taskId = e.dataTransfer.getData('taskId')
+    if (!taskId) return
+
+    const task = weekTasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const originalDay = dayjs(task.startTime).format('YYYY-MM-DD')
+    if (originalDay === targetDayKey) return  // dropped on same day — no-op
+
+    // Preserve the original time-of-day, just change the date
+    const origStart = dayjs(task.startTime)
+    const origEnd = dayjs(task.endTime)
+    const targetDay = dayjs(targetDayKey)
+    const newStart = targetDay
+      .hour(origStart.hour())
+      .minute(origStart.minute())
+      .second(0)
+      .millisecond(0)
+    const newEnd = newStart.add(origEnd.diff(origStart, 'minute'), 'minute')
+
+    const updated: Task = {
+      ...task,
+      startTime: newStart.toISOString(),
+      endTime: newEnd.toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    // Optimistic update
+    setWeekTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    setDropSuccess(taskId)
+    setTimeout(() => setDropSuccess(null), 1200)
+
+    try {
+      await window.api.tasks.update(updated)
+    } catch {
+      // Revert on failure
+      setWeekTasks(prev => prev.map(t => t.id === taskId ? task : t))
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -600,22 +681,42 @@ function WeekView({ onEditTask, onAddAt }: {
             const tasks = tasksByDay[key] ?? []
             const done = tasks.filter(t => t.status === 'completed').length
             const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0
+            const isDropTarget = dragOverDay === key && draggingId !== null
 
             return (
-              <div key={key} className={`flex flex-col flex-1 border-r last:border-r-0 border-gray-200 dark:border-gray-700 min-w-0 ${
-                isToday ? 'bg-indigo-50/60 dark:bg-indigo-900/10' : isPast ? 'bg-gray-50/50 dark:bg-gray-900/30' : ''
-              }`}>
+              <div
+                key={key}
+                onDragEnter={e => handleDragEnter(e, key)}
+                onDragLeave={e => handleDragLeave(e, key)}
+                onDragOver={handleDragOver}
+                onDrop={e => handleDrop(e, key)}
+                className={`flex flex-col flex-1 border-r last:border-r-0 min-w-0 transition-colors ${
+                  isDropTarget
+                    ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/25 border-2'
+                    : isToday
+                    ? 'border-gray-200 dark:border-gray-700 bg-indigo-50/60 dark:bg-indigo-900/10'
+                    : isPast
+                    ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30'
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
                 {/* Day header */}
                 <div className={`px-2 py-2 border-b text-center shrink-0 ${
+                  isDropTarget ? 'border-indigo-300 dark:border-indigo-600' :
                   isToday ? 'border-indigo-300 dark:border-indigo-700' : 'border-gray-200 dark:border-gray-700'
                 }`}>
                   <div className={`text-[10px] font-bold uppercase tracking-widest ${
+                    isDropTarget ? 'text-indigo-600 dark:text-indigo-400' :
                     isToday ? 'text-indigo-500' : isPast ? 'text-gray-400 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400'
                   }`}>{WEEK_DAYS[day.day()]}</div>
                   <div className={`text-lg font-black leading-none mt-0.5 ${
+                    isDropTarget ? 'text-indigo-600 dark:text-indigo-400' :
                     isToday ? 'text-indigo-600 dark:text-indigo-400' : isPast ? 'text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-200'
                   }`}>{day.format('D')}</div>
-                  {tasks.length > 0 && (
+                  {isDropTarget && (
+                    <div className="text-[9px] font-bold text-indigo-500 mt-0.5">Drop here</div>
+                  )}
+                  {!isDropTarget && tasks.length > 0 && (
                     <div className="flex items-center gap-1 justify-center mt-1">
                       <div className="w-10 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: isToday ? '#6366f1' : '#10b981' }} />
@@ -632,48 +733,82 @@ function WeekView({ onEditTask, onAddAt }: {
                       <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : tasks.length === 0 ? (
-                    <button
-                      onClick={() => onAddAt(day.hour(9).minute(0).toISOString())}
-                      className="w-full mt-2 py-2 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-[10px] text-gray-300 dark:text-gray-600 hover:border-indigo-300 hover:text-indigo-400 dark:hover:border-indigo-700 dark:hover:text-indigo-500 transition-colors"
-                    >+ add</button>
+                    <div className={`w-full mt-2 flex flex-col items-center justify-center py-3 rounded-lg border border-dashed transition-colors ${
+                      isDropTarget
+                        ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-100/50 dark:bg-indigo-900/30'
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}>
+                      {isDropTarget ? (
+                        <span className="text-[10px] font-bold text-indigo-500">📅 Move here</span>
+                      ) : (
+                        <button
+                          onClick={() => onAddAt(day.hour(9).minute(0).toISOString())}
+                          className="text-[10px] text-gray-300 dark:text-gray-600 hover:text-indigo-400 dark:hover:text-indigo-500 transition-colors"
+                        >+ add</button>
+                      )}
+                    </div>
                   ) : (
                     <>
-                      {tasks.map(task => (
-                        <button
-                          key={task.id}
-                          onClick={() => onEditTask(task)}
-                          className={`w-full text-left px-1.5 py-1 rounded-lg border transition-all hover:shadow-sm group ${
-                            task.status === 'completed'
-                              ? 'border-green-200 dark:border-green-900/40 bg-green-50/50 dark:bg-green-900/10 opacity-60'
-                              : task.status === 'skipped'
-                              ? 'border-gray-200 dark:border-gray-700 opacity-50'
-                              : isToday && task.status === 'active'
-                              ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20'
-                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700'
-                          }`}
-                        >
-                          <div className="flex items-start gap-1">
-                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${STATUS_DOT[task.status] ?? 'bg-gray-300'}`} />
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-[10px] font-bold leading-tight truncate ${
-                                task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'
-                              }`}>{task.title}</div>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <div className="w-1 h-3.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
-                                <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{dayjs(task.startTime).format('h:mm A')}</span>
-                                <span className="text-[9px] text-gray-300 dark:text-gray-600">{task.durationMinutes}m</span>
-                                {task.repeatRule && task.repeatRule !== 'none' && (
-                                  <span className="text-[8px] text-violet-400">🔁</span>
-                                )}
+                      {tasks.map(task => {
+                        const canDrag = task.status !== 'completed' && task.status !== 'skipped'
+                        const justDropped = dropSuccess === task.id
+                        return (
+                          <div
+                            key={task.id}
+                            draggable={canDrag}
+                            onDragStart={canDrag ? e => handleDragStart(e, task) : undefined}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => onEditTask(task)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => e.key === 'Enter' && onEditTask(task)}
+                            className={`w-full text-left px-1.5 py-1 rounded-lg border transition-all select-none ${
+                              justDropped
+                                ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 scale-[1.02] shadow-sm'
+                                : draggingId === task.id
+                                ? 'opacity-40 border-indigo-300 dark:border-indigo-700 scale-95'
+                                : task.status === 'completed'
+                                ? 'border-green-200 dark:border-green-900/40 bg-green-50/50 dark:bg-green-900/10 opacity-60'
+                                : task.status === 'skipped'
+                                ? 'border-gray-200 dark:border-gray-700 opacity-50'
+                                : isToday && task.status === 'active'
+                                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 hover:shadow-sm'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
+                            } ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          >
+                            <div className="flex items-start gap-1">
+                              {canDrag && (
+                                <span className="text-[8px] text-gray-300 dark:text-gray-600 mt-0.5 leading-none select-none">⠿</span>
+                              )}
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${STATUS_DOT[task.status] ?? 'bg-gray-300'}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[10px] font-bold leading-tight truncate ${
+                                  task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'
+                                }`}>{task.title}</div>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <div className="w-1 h-3.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
+                                  <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">{dayjs(task.startTime).format('h:mm A')}</span>
+                                  <span className="text-[9px] text-gray-300 dark:text-gray-600">{task.durationMinutes}m</span>
+                                  {task.repeatRule && task.repeatRule !== 'none' && (
+                                    <span className="text-[8px] text-violet-400">🔁</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => onAddAt(day.hour(12).minute(0).toISOString())}
-                        className="w-full py-1 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-[9px] text-gray-300 dark:text-gray-600 hover:border-indigo-300 hover:text-indigo-400 dark:hover:border-indigo-700 dark:hover:text-indigo-500 transition-colors"
-                      >+</button>
+                        )
+                      })}
+                      {!isDropTarget && (
+                        <button
+                          onClick={() => onAddAt(day.hour(12).minute(0).toISOString())}
+                          className="w-full py-1 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-[9px] text-gray-300 dark:text-gray-600 hover:border-indigo-300 hover:text-indigo-400 dark:hover:border-indigo-700 dark:hover:text-indigo-500 transition-colors"
+                        >+</button>
+                      )}
+                      {isDropTarget && (
+                        <div className="w-full py-2 rounded-lg border-2 border-dashed border-indigo-400 dark:border-indigo-500 text-[10px] font-bold text-indigo-500 text-center bg-indigo-50/50 dark:bg-indigo-900/20">
+                          📅 Move here
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
