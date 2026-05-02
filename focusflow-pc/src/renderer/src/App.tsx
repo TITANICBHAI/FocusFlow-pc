@@ -475,7 +475,7 @@ function AppShell() {
           {page === 'today'    && <TodayScreen navigate={navigate} />}
           {page === 'week'     && <WeekScreen navigate={navigate} />}
           {page === 'focus'    && <FocusScreen navigate={navigate} />}
-          {page === 'stats'    && <StatsScreen />}
+          {page === 'stats'    && <StatsScreen navigate={navigate} />}
           {page === 'settings' && <SettingsScreen navigate={navigate} />}
           {page === 'profile'  && <ProfileScreen onBack={() => navigate('settings')} />}
           {page === 'reports'  && <ReportsScreen onBack={() => navigate('stats')} />}

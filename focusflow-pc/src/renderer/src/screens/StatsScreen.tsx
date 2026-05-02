@@ -339,7 +339,7 @@ function WeeklyComparison({ completions }: { completions: { date: string; comple
 }
 
 // ── Main StatsScreen ──────────────────────────────────────────────────────────
-export default function StatsScreen() {
+export default function StatsScreen({ navigate }: { navigate?: (p: string) => void }) {
   const { state } = useApp()
   const [filter, setFilter] = useState<Filter>('today')
   const [streak, setStreak] = useState(0)
@@ -540,6 +540,22 @@ export default function StatsScreen() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 animate-fade-in">
               <Heatmap completions={completions} />
             </div>
+            {/* Focus History link */}
+            {navigate && (
+              <button
+                onClick={() => navigate('focusHistory')}
+                className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl transition-colors animate-fade-in group"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🕐</span>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300">View Focus History</p>
+                    <p className="text-xs text-indigo-500 dark:text-indigo-400">Every session, duration &amp; override — all in one timeline</p>
+                  </div>
+                </div>
+                <span className="text-indigo-400 dark:text-indigo-500 text-lg group-hover:translate-x-1 transition-transform">→</span>
+              </button>
+            )}
           </>
         )}
       </div>
