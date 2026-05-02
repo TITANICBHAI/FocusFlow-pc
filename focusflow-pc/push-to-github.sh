@@ -15,8 +15,14 @@ echo "=== FocusFlow PC — Push to GitHub ==="
 echo "Repo: https://github.com/$GITHUB_USER/$REPO_NAME"
 echo ""
 
-# Ensure we're in the focusflow-pc directory
 cd "$(dirname "$0")"
+
+REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${REPO_NAME}.git"
+
+# Pull any remote-only commits first so we stay in sync
+echo "Pulling latest from remote..."
+GIT_TERMINAL_PROMPT=0 git pull "$REMOTE_URL" main --rebase --no-edit 2>&1 | grep -v "ghp_"
+echo ""
 
 # Stage all changes
 git add -A
@@ -30,8 +36,7 @@ else
   echo "✓ Committed."
 fi
 
-# Push using token embedded in URL, bypassing askpass entirely
-REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${REPO_NAME}.git"
+# Push
 echo "Pushing to GitHub..."
 GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main \
   && echo "" && echo "✓ Pushed! GitHub Actions will now build the .exe." \
