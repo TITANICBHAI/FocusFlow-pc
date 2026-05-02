@@ -1,6 +1,7 @@
 #!/bin/bash
 # FocusFlow PC — GitHub Push Script
 # Configured as a Replit workflow — restart to push latest changes.
+set -o pipefail
 
 GITHUB_TOKEN=${GITHUB_TOKEN:-$GITHUB_PERSONAL_ACCESS_TOKEN}
 GITHUB_USER="TITANICBHAI"
@@ -19,11 +20,18 @@ cd "$(dirname "$0")"
 
 REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${REPO_NAME}.git"
 
+# Helper: run git push and hide the token from logs, return real git exit code
+safe_push() {
+  local flags=("$@")
+  GIT_TERMINAL_PROMPT=0 git push "${flags[@]}" "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
+  return ${PIPESTATUS[0]}
+}
+
 # 1. Clean up any broken rebase/merge state
 git rebase --abort 2>/dev/null || true
-git merge --abort 2>/dev/null || true
+git merge --abort  2>/dev/null || true
 
-# 2. Ensure we are on main branch (detached HEAD after rebase leaves mess)
+# 2. Ensure we are on main branch
 CURRENT=$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
 if [ "$CURRENT" != "main" ]; then
   echo "Switching to main branch..."
@@ -42,34 +50,56 @@ else
   echo "✓ Committed."
 fi
 
-# 5. Fetch remote to check divergence
+# 5. Fetch remote
 echo "Syncing with remote..."
-GIT_TERMINAL_PROMPT=0 git fetch "$REMOTE_URL" main:refs/remotes/origin/main 2>&1 | grep -v "ghp_" || true
+GIT_TERMINAL_PROMPT=0 git fetch "$REMOTE_URL" main:refs/remotes/origin/main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
 
-# 6. Rebase our commits on top of remote (safe if not diverged, no-op if up-to-date)
+# 6. Try fast-forward rebase
 REMOTE_SHA=$(git rev-parse refs/remotes/origin/main 2>/dev/null || echo "")
 if [ -n "$REMOTE_SHA" ]; then
   git rebase refs/remotes/origin/main 2>/dev/null || {
-    echo "Rebase conflict detected — aborting rebase and will force-push."
+    echo "Rebase conflict detected — will force-push."
     git rebase --abort 2>/dev/null || true
   }
 fi
 
-# 7. Push — fall back to force push if history diverged
+# 7. Push attempts — use PIPESTATUS[0] for real git exit code
 echo "Pushing to GitHub..."
-GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" \
-  && echo "" && echo "✓ Pushed! GitHub Actions will now build the .exe." \
-  || {
-    echo "Normal push rejected — rebasing and retrying..."
-    # Re-fetch and try one more time
-    GIT_TERMINAL_PROMPT=0 git fetch "$REMOTE_URL" main:refs/remotes/origin/main 2>&1 | grep -v "ghp_" || true
-    git rebase refs/remotes/origin/main 2>/dev/null || git rebase --abort 2>/dev/null || true
-    GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" \
-      && echo "" && echo "✓ Pushed after rebase! GitHub Actions will now build the .exe." \
-      || {
-        echo "Retried push also failed — using force push (Replit is source of truth)..."
-        GIT_TERMINAL_PROMPT=0 git push --force "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" \
-          && echo "" && echo "✓ Force-pushed! GitHub Actions will now build the .exe." \
-          || echo "✗ Push failed — check token and repo access."
-      }
-  }
+
+# Attempt 1: normal push
+GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
+PUSH_EC=${PIPESTATUS[0]}
+
+if [ "$PUSH_EC" -eq 0 ]; then
+  echo ""
+  echo "✓ Pushed! GitHub Actions will now build the .exe."
+  exit 0
+fi
+
+# Attempt 2: fetch + rebase + push
+echo "Normal push rejected — re-fetching and retrying..."
+GIT_TERMINAL_PROMPT=0 git fetch "$REMOTE_URL" main:refs/remotes/origin/main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
+git rebase refs/remotes/origin/main 2>/dev/null || git rebase --abort 2>/dev/null || true
+
+GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
+PUSH_EC=${PIPESTATUS[0]}
+
+if [ "$PUSH_EC" -eq 0 ]; then
+  echo ""
+  echo "✓ Pushed after rebase! GitHub Actions will now build the .exe."
+  exit 0
+fi
+
+# Attempt 3: force push (Replit is source of truth)
+echo "Retry also rejected — force-pushing..."
+GIT_TERMINAL_PROMPT=0 git push --force "$REMOTE_URL" HEAD:main 2>&1 | grep -v "ghp_" | grep -v "github_pat_" || true
+PUSH_EC=${PIPESTATUS[0]}
+
+if [ "$PUSH_EC" -eq 0 ]; then
+  echo ""
+  echo "✓ Force-pushed! GitHub Actions will now build the .exe."
+  exit 0
+fi
+
+echo "✗ Push failed — check token and repo access."
+exit 1
