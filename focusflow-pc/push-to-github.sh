@@ -18,9 +18,6 @@ echo ""
 # Ensure we're in the focusflow-pc directory
 cd "$(dirname "$0")"
 
-# Set authenticated remote
-git remote set-url origin "https://$GITHUB_TOKEN@github.com/$GITHUB_USER/$REPO_NAME.git"
-
 # Stage all changes
 git add -A
 
@@ -33,7 +30,9 @@ else
   echo "✓ Committed."
 fi
 
-# Push
+# Push using token embedded in URL, bypassing askpass entirely
+REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${REPO_NAME}.git"
 echo "Pushing to GitHub..."
-git push -u origin main && echo "" && echo "✓ Pushed! GitHub Actions will now build the .exe." \
+GIT_TERMINAL_PROMPT=0 git push "$REMOTE_URL" HEAD:main \
+  && echo "" && echo "✓ Pushed! GitHub Actions will now build the .exe." \
   || echo "✗ Push failed — check token and repo access."
