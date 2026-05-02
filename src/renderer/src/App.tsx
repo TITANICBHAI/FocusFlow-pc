@@ -216,6 +216,7 @@ function AppShell() {
               { id: 'active' as Page,            label: 'Active Status',    icon: '⚡' },
               { id: 'standalone-block' as Page,  label: 'Standalone Block', icon: '⏱' },
               { id: 'block-defense' as Page,     label: 'Block Defense',    icon: '🛡' },
+              { id: 'import-blocklist' as Page,  label: 'Import Blocklist', icon: '📥' },
               { id: 'reports' as Page,           label: 'Reports',          icon: '📋' },
               { id: 'profile' as Page,           label: 'Profile',          icon: '👤' },
             ]).map(item => (

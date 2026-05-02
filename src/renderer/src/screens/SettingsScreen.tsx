@@ -250,6 +250,9 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
           <Row label="Dark Mode" desc="Switch between light and dark theme">
             <Toggle value={settings.darkMode} onChange={v => update({ darkMode: v })} />
           </Row>
+          <Row label="Beginner Mode" desc="Shows tips, guided prompts, and extra hints throughout the app">
+            <Toggle value={settings.beginnerMode ?? false} onChange={v => update({ beginnerMode: v })} />
+          </Row>
         </Section>
 
         <Section title="Scheduling">
@@ -328,6 +331,14 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
           <BtnRow icon="🌐" label="Blocked Websites" desc={`${settings.blockedWebsites?.length ?? 0} site${(settings.blockedWebsites?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => setShowSites(true)} />
           <BtnRow icon="🔤" label="Keyword Blocker" desc={`${settings.blockedWords?.length ?? 0} keyword${(settings.blockedWords?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => navigate('keyword-blocker')} />
           <BtnRow icon="⏰" label="Block Schedules" desc={`${settings.recurringBlockSchedules?.length ?? 0} recurring schedule${(settings.recurringBlockSchedules?.length ?? 0) !== 1 ? 's' : ''}`} onClick={() => navigate('block-defense')} />
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="text-lg">♾️</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Auto-Copy to Always-On</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Automatically add focus-blocked sites to the Always-On list too</p>
+            </div>
+            <Toggle value={settings.autoCopyToAlwaysOn ?? false} onChange={v => update({ autoCopyToAlwaysOn: v })} />
+          </div>
         </Section>
 
         <Section title="Backup">
