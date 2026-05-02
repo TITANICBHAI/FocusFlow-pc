@@ -1,59 +1,75 @@
 import React, { useState } from 'react'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+
+interface ChangelogSection {
+  heading: string
+  icon: string
+  items: string[]
+}
 
 interface ChangelogEntry {
   version: string
   date: string
-  badge?: 'new' | 'fix' | 'pc'
-  sections: { heading: string; icon: string; items: string[] }[]
+  label?: string
+  labelColor?: string
+  sections: ChangelogSection[]
 }
 
 const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.1.0',
     date: 'May 2026',
-    badge: 'pc',
+    label: 'Latest',
+    labelColor: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800',
     sections: [
+      {
+        heading: 'Standalone Block Screen',
+        icon: '⏱',
+        items: [
+          'New Standalone Block screen — start a timed website block without any task or focus session',
+          'Choose a custom duration (15m – 8h) or use quick-pick buttons',
+          'Block schedules, always-on list, and keyword blocker are all compatible with standalone blocks',
+          'Live countdown with one-click stop (with PIN confirmation if session PIN is enabled)',
+        ],
+      },
       {
         heading: 'Block Defense Screen',
         icon: '🛡',
         items: [
-          'New dedicated Block Enforcement screen — all layers in one place',
-          'Full website blocking list with per-site on/off toggle',
-          'Recurring Block Schedules — set time windows (e.g. Mon–Fri 9–17) that block specific sites automatically, no session needed',
-          'Focus Session Behaviour toggle: keep blocking active for the full task duration even if you finish early',
-          'Aversion Sound deterrent toggle — a startling audio cue fires when you hit a blocked site',
+          'Dedicated Block Enforcement screen — all enforcement layers in one place',
+          'Full website blocking list with per-site enable/disable toggle',
+          'Recurring Block Schedules — set time windows (e.g. Mon–Fri 9–17) that block sites automatically, no session needed',
+          'Focus Session Behaviour toggle — keep blocking active for the full task duration even if you finish early',
+          'Aversion Sound deterrent — a startling audio cue fires when you visit a blocked site',
         ],
       },
       {
         heading: 'Keyword Blocker Screen',
         icon: '🔤',
         items: [
-          'Dedicated full-page keyword blocker with 6 quick-add presets: Doomscroll bait, Social-media drama, Shorts/Reels bait, Impulse-buy traps, Gambling triggers, NSFW content',
-          'Custom keyword editor modal with real-time chip display',
-          'One-tap remove any keyword from the main page',
-          'Privacy notice — all matching is done locally, nothing sent to servers',
+          '6 quick-add presets: Doomscroll bait, Social-media drama, Shorts/Reels bait, Impulse-buy traps, Gambling triggers, NSFW content',
+          'Custom keyword editor with real-time chip display',
+          'One-tap remove any keyword from the main list',
         ],
       },
       {
         heading: 'Always-On Block List',
         icon: '♾️',
         items: [
-          'New Always-On Block List screen — add domains to block 24/7 with no timer or session needed',
-          'Quick preset groups for Social Media, Video, News/Outrage, Shopping',
-          'Separate from the focus-session block list — explained side-by-side in the UI',
-          'Toggle to enable/disable always-on enforcement without clearing the list',
+          'Two-column desktop layout — blocked list on the left, presets + bulk-paste on the right',
+          'Bulk-paste panel — paste a list of URLs/domains to block them all at once',
+          'Quick preset groups: Social Media, Short-form Video, Streaming, News, Shopping, Gambling',
+          'Enable/disable toggle in header — pauses enforcement without clearing the list',
         ],
       },
       {
         heading: 'Active Status Screen',
         icon: '⚡',
         items: [
-          'Active Status screen now shows all 5 enforcement layers with live status badges',
-          'Real-time detection of block schedules currently in their active window — amber banner with schedule details',
-          '"LIVE" badge on any schedule running right now',
-          'Direct Edit navigation from each enforcement layer row',
+          '6 enforcement layers with live status badges (focus session, website blocking, keyword blocker, block schedules, always-on, Pomodoro)',
+          'Live schedule detection — amber banner shows when a scheduled block is running right now',
+          '"LIVE" badge on any schedule currently inside its active window',
         ],
       },
     ],
@@ -61,16 +77,17 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.0',
     date: 'April 2026',
-    badge: 'new',
+    label: 'Initial Release',
+    labelColor: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
     sections: [
       {
         heading: 'Core Productivity Engine',
         icon: '⏱',
         items: [
-          'Task-based focus sessions with configurable start time and duration',
+          'Task-based focus sessions with start time and configurable duration',
           'Priority levels: critical, high, medium, low — colour-coded throughout',
           'Pomodoro timer with configurable work/break intervals',
-          'Today timeline view — drag tasks, see overlaps, add tasks by clicking on empty time slots',
+          'Today timeline view — drag tasks, see overlaps, click empty slots to add tasks',
           'Week view with daily task summary cards',
         ],
       },
@@ -80,9 +97,8 @@ const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Focus Mode activates enforcement for the duration of a task',
           'Website blocking list — track and block distracting domains during sessions',
-          'Keyword blocker — flag content matching specific words in browser activity',
+          'Keyword blocker — flag content matching specific words',
           'Aversion Sound deterrent',
-          'Standalone timed blocks with countdown',
         ],
       },
       {
@@ -90,10 +106,9 @@ const CHANGELOG: ChangelogEntry[] = [
         icon: '📊',
         items: [
           'Stats screen: today, yesterday, week, all-time focus minutes, completion rate, override count',
-          'Productivity Score (A+–F graded) using completion %, focus time, and override penalties',
+          'Productivity Score (A+–F) based on completion %, focus time, and override penalties',
           'Streak tracking — consecutive days with completed tasks',
           'Reports screen: focus-time hero, task breakdown (on-time / late / skipped), weekly heatmap',
-          'Daily completion history bar chart',
         ],
       },
       {
@@ -102,7 +117,7 @@ const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Full user profile: name, occupation, chronotype, sleep time, focus goals, distraction triggers',
           'Dark mode support',
-          'Backup export to JSON — all tasks and settings',
+          'Backup export to JSON',
           'Weekly report notification',
           'Onboarding flow for first-run setup',
         ],
@@ -113,7 +128,7 @@ const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Electron 29 desktop app — native window controls, system tray',
           'SQLite database (WAL mode) for fast local storage',
-          'Global keyboard shortcuts (Ctrl+Shift+1–4 for navigation, Ctrl+Shift+Space to show/hide)',
+          'Global keyboard shortcuts (Ctrl+Shift+1–4, Ctrl+Shift+Space)',
           'Frameless window with custom title bar',
           'Daily Notes screen with local persistence',
         ],
@@ -122,24 +137,17 @@ const CHANGELOG: ChangelogEntry[] = [
   },
 ]
 
-const BADGE_STYLES: Record<string, string> = {
-  new: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800',
-  fix: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800',
-  pc: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
-}
-const BADGE_LABEL: Record<string, string> = { new: 'New', fix: 'Fix', pc: 'PC Update' }
-
 export default function ChangelogScreen({ navigate }: { navigate: (p: Page) => void }) {
-  const [expanded, setExpanded] = useState<string>(CHANGELOG[0].version)
-
-  const toggle = (v: string) => setExpanded(prev => prev === v ? '' : v)
+  const [selected, setSelected] = useState(0)
+  const entry = CHANGELOG[selected]
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center gap-3">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center gap-4">
         <button
           onClick={() => navigate('settings')}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
           ←
         </button>
@@ -149,79 +157,97 @@ export default function ChangelogScreen({ navigate }: { navigate: (p: Page) => v
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-        {CHANGELOG.map((entry, idx) => {
-          const isOpen = expanded === entry.version
-          return (
-            <div
-              key={entry.version}
-              className={`rounded-2xl border overflow-hidden transition-all ${
-                isOpen
-                  ? 'border-indigo-200 dark:border-indigo-700'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+      {/* Two-column layout */}
+      <div className="flex-1 overflow-hidden flex">
+
+        {/* LEFT — version list */}
+        <div className="w-56 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto py-3">
+          {CHANGELOG.map((e, i) => (
+            <button
+              key={e.version}
+              onClick={() => setSelected(i)}
+              className={`w-full text-left px-4 py-4 border-b border-gray-50 dark:border-gray-750 transition-all ${
+                selected === i
+                  ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-l-indigo-500'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-750 border-l-2 border-l-transparent'
               }`}
             >
-              <button
-                onClick={() => toggle(entry.version)}
-                className={`w-full flex items-center gap-3 px-4 py-4 text-left transition-colors ${
-                  isOpen
-                    ? 'bg-indigo-50 dark:bg-indigo-900/20'
-                    : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  isOpen ? 'bg-indigo-500' : 'bg-gray-100 dark:bg-gray-700'
-                }`}>
-                  <span className={`text-xs font-black ${isOpen ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
-                    {entry.version.startsWith('1.') ? 'v' + entry.version : entry.version}
+              <div className="flex items-start gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selected === i ? 'bg-indigo-500' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                  <span className={`text-[10px] font-black ${selected === i ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`}>
+                    v{e.version}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-gray-800 dark:text-gray-100">Version {entry.version}</span>
-                    {idx === 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400">
-                        LATEST
-                      </span>
-                    )}
-                    {entry.badge && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${BADGE_STYLES[entry.badge]}`}>
-                        {BADGE_LABEL[entry.badge]}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{entry.date}</p>
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold truncate ${selected === i ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-200'}`}>
+                    v{e.version}
+                  </p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{e.date}</p>
+                  {e.label && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block mt-1 ${e.labelColor}`}>
+                      {e.label}
+                    </span>
+                  )}
                 </div>
-                <span className="text-gray-400 text-sm flex-shrink-0">{isOpen ? '▲' : '▼'}</span>
-              </button>
+              </div>
+            </button>
+          ))}
 
-              {isOpen && (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {entry.sections.map((section, si) => (
-                    <div key={si} className="px-4 py-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-lg">{section.icon}</span>
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{section.heading}</span>
-                      </div>
-                      <ul className="space-y-2">
-                        {section.items.map((item, ii) => (
-                          <li key={ii} className="flex items-start gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />
-                            <span className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+          <div className="px-4 py-4 text-center">
+            <p className="text-[10px] text-gray-300 dark:text-gray-600">All data stored locally — no servers</p>
+          </div>
+        </div>
+
+        {/* RIGHT — entry detail */}
+        <div className="flex-1 overflow-y-auto px-8 py-6">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-xs font-black">v{entry.version}</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Version {entry.version}</h2>
+                  {entry.label && (
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${entry.labelColor}`}>
+                      {entry.label}
+                    </span>
+                  )}
                 </div>
-              )}
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">{entry.date}</p>
+              </div>
             </div>
-          )
-        })}
 
-        <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-3">
-          All data stays on your device — nothing is sent to any server.
-        </p>
+            <div className="space-y-5">
+              {entry.sections.map((section, si) => (
+                <div key={si} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-xl">{section.icon}</span>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{section.heading}</span>
+                    <span className="ml-auto text-xs text-gray-300 dark:text-gray-600">{section.items.length} changes</span>
+                  </div>
+                  <ul className="px-5 py-3 space-y-2">
+                    {section.items.map((item, ii) => (
+                      <li key={ii} className="flex items-start gap-2.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            {selected < CHANGELOG.length - 1 && (
+              <button
+                onClick={() => setSelected(selected + 1)}
+                className="mt-4 flex items-center gap-2 text-sm text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors"
+              >
+                ← See v{CHANGELOG[selected + 1].version}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

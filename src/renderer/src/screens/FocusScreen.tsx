@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { formatTime, getActiveTask, isAwaitingDecision } from '../services/taskService'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
 
 // ── Web Audio beep ──────────────────────────────────────────────────────────
 function beep(type: 'work' | 'break' | 'done') {

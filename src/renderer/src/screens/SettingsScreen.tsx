@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -213,6 +213,7 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
         </Section>
 
         <Section title="Focus Enforcement (PC)">
+          <BtnRow icon="⏱" label="Standalone Block" desc="Start a timed block right now — no task needed" onClick={() => navigate('standalone-block')} />
           <BtnRow icon="🛡" label="Block Enforcement" desc="Websites, keywords, schedules & deterrents" onClick={() => navigate('block-defense')} />
           <BtnRow icon="♾️" label="Always-On Block List" desc={`${settings.alwaysOnPackages?.length ?? 0} domain${(settings.alwaysOnPackages?.length ?? 0) !== 1 ? 's' : ''} blocked 24/7`} onClick={() => navigate('always-on')} />
           <BtnRow icon="🌐" label="Blocked Websites" desc={`${settings.blockedWebsites?.length ?? 0} site${(settings.blockedWebsites?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => setShowSites(true)} />

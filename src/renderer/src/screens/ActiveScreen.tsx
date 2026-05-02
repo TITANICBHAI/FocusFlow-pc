@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { formatTime } from '../services/taskService'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -51,6 +51,12 @@ export default function ActiveScreen({ navigate }: { navigate: (p: Page) => void
     return currentMins >= start && currentMins < end
   })
 
+  const standaloneUntil = settings.standaloneBlockUntil ? new Date(settings.standaloneBlockUntil) : null
+  const standaloneActive = standaloneUntil !== null && standaloneUntil > new Date()
+  const standaloneRemaining = standaloneActive && standaloneUntil
+    ? Math.max(0, Math.round((standaloneUntil.getTime() - Date.now()) / 60000))
+    : 0
+
   const layers = [
     {
       label: 'Focus Session',
@@ -60,6 +66,17 @@ export default function ActiveScreen({ navigate }: { navigate: (p: Page) => void
       color: '#6366f1',
       action: focusActive ? undefined : () => navigate('focus'),
       actionLabel: 'Start',
+    },
+    {
+      label: 'Standalone Block',
+      on: standaloneActive,
+      icon: '⏱',
+      desc: standaloneActive
+        ? `Running — ${standaloneRemaining}m remaining (ends ${standaloneUntil ? new Date(standaloneUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''})`
+        : 'No timed block active',
+      color: '#f43f5e',
+      action: () => navigate('standalone-block'),
+      actionLabel: standaloneActive ? 'View' : 'Start',
     },
     {
       label: 'Website Blocking',

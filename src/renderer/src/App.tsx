@@ -16,6 +16,7 @@ import AlwaysOnScreen from './screens/AlwaysOnScreen'
 import ChangelogScreen from './screens/ChangelogScreen'
 import HowToUseScreen from './screens/HowToUseScreen'
 import PrivacyScreen from './screens/PrivacyScreen'
+import StandaloneBlockScreen from './screens/StandaloneBlockScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
 export type Page =
@@ -28,6 +29,7 @@ export type Page =
   | 'keyword-blocker'
   | 'always-on'
   | 'changelog'
+  | 'standalone-block'
   | 'how-to-use'
   | 'privacy'
 
@@ -40,7 +42,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = 
 ]
 
 // Pages grouped under "block-defense" for active highlight
-const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on']
+const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on', 'standalone-block']
 
 function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   const [isMax, setIsMax] = useState(false)
@@ -208,11 +210,12 @@ function AppShell() {
               <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">More</div>
             </div>
             {([
-              { id: 'notes' as Page,        label: 'Daily Notes',    icon: '📝' },
-              { id: 'active' as Page,       label: 'Active Status',  icon: '⚡' },
-              { id: 'block-defense' as Page, label: 'Block Defense',  icon: '🛡' },
-              { id: 'reports' as Page,      label: 'Reports',        icon: '📋' },
-              { id: 'profile' as Page,      label: 'Profile',        icon: '👤' },
+              { id: 'notes' as Page,             label: 'Daily Notes',      icon: '📝' },
+              { id: 'active' as Page,            label: 'Active Status',    icon: '⚡' },
+              { id: 'standalone-block' as Page,  label: 'Standalone Block', icon: '⏱' },
+              { id: 'block-defense' as Page,     label: 'Block Defense',    icon: '🛡' },
+              { id: 'reports' as Page,           label: 'Reports',          icon: '📋' },
+              { id: 'profile' as Page,           label: 'Profile',          icon: '👤' },
             ]).map(item => (
               <button
                 key={item.id}
@@ -258,7 +261,8 @@ function AppShell() {
           {page === 'always-on'       && <AlwaysOnScreen navigate={navigate} />}
           {page === 'changelog'       && <ChangelogScreen navigate={navigate} />}
           {page === 'how-to-use'      && <HowToUseScreen navigate={navigate} />}
-          {page === 'privacy'         && <PrivacyScreen navigate={navigate} />}
+          {page === 'privacy'          && <PrivacyScreen navigate={navigate} />}
+          {page === 'standalone-block' && <StandaloneBlockScreen navigate={navigate} />}
         </main>
       </div>
 
