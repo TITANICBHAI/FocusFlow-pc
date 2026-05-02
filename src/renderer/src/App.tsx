@@ -23,6 +23,7 @@ import DailyAllowanceScreen from './screens/DailyAllowanceScreen'
 import WeeklyReportScreen from './screens/WeeklyReportScreen'
 import OverlayAppearanceScreen from './screens/OverlayAppearanceScreen'
 import AllowedInFocusScreen from './screens/AllowedInFocusScreen'
+import FocusSessionHistoryScreen from './screens/FocusSessionHistoryScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
 export type Page =
@@ -43,6 +44,7 @@ export type Page =
   | 'weekly-report'
   | 'overlay-appearance'
   | 'allowed-in-focus'
+  | 'session-history'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -245,6 +247,7 @@ function AppShell() {
               { id: 'import-blocklist' as Page,  label: 'Import Blocklist', icon: '📥' },
               { id: 'daily-allowance' as Page,   label: 'Daily Allowance',  icon: '⏳' },
               { id: 'weekly-report' as Page,     label: 'Weekly Report',    icon: '📊' },
+              { id: 'session-history' as Page,   label: 'Session History',  icon: '🕐' },
               { id: 'reports' as Page,           label: 'Reports',          icon: '📋' },
               { id: 'profile' as Page,           label: 'Profile',          icon: '👤' },
             ]).map(item => (
@@ -299,6 +302,7 @@ function AppShell() {
           {page === 'weekly-report'       && <WeeklyReportScreen navigate={navigate} />}
           {page === 'overlay-appearance'  && <OverlayAppearanceScreen navigate={navigate} />}
           {page === 'allowed-in-focus'    && <AllowedInFocusScreen navigate={navigate} />}
+          {page === 'session-history'     && <FocusSessionHistoryScreen navigate={navigate} />}
         </main>
       </div>
 

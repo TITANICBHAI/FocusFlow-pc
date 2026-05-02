@@ -339,6 +339,52 @@ export function getRecentDayCompletions(days: number): { date: string; completed
   return db.prepare(`SELECT date,completed,total FROM daily_completions WHERE date >= ? ORDER BY date ASC`).all(cutoffStr) as { date: string; completed: number; total: number }[]
 }
 
+export interface FocusSessionRecord {
+  id: number
+  taskId: string
+  taskTitle: string
+  startedAt: string
+  endedAt: string | null
+  durationMinutes: number
+  overrideCount: number
+}
+
+export function getRecentFocusSessions(limit = 100): FocusSessionRecord[] {
+  const rows = db.prepare(`
+    SELECT
+      fs.id,
+      fs.task_id,
+      COALESCE(t.title, 'Unknown Task') AS task_title,
+      fs.started_at,
+      fs.ended_at,
+      (SELECT COUNT(*) FROM focus_overrides fo
+        WHERE fo.task_id = fs.task_id
+          AND fo.overridden_at >= fs.started_at
+          AND (fs.ended_at IS NULL OR fo.overridden_at <= fs.ended_at)
+      ) AS override_count
+    FROM focus_sessions fs
+    LEFT JOIN tasks t ON t.id = fs.task_id
+    WHERE fs.is_active = 0
+    ORDER BY fs.started_at DESC
+    LIMIT ?
+  `).all(limit) as { id: number; task_id: string; task_title: string; started_at: string; ended_at: string | null; override_count: number }[]
+
+  return rows.map(r => {
+    const ms = r.ended_at
+      ? new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()
+      : 0
+    return {
+      id: r.id,
+      taskId: r.task_id,
+      taskTitle: r.task_title,
+      startedAt: r.started_at,
+      endedAt: r.ended_at,
+      durationMinutes: Math.round(ms / 60000),
+      overrideCount: r.override_count,
+    }
+  })
+}
+
 // ── Daily Notes ───────────────────────────────────────────────────────────────
 
 export function getNoteForDate(date: string): string {

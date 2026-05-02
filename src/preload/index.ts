@@ -29,6 +29,7 @@ const api = {
     getRecentDayCompletions: (days: number) => ipcRenderer.invoke('stats:getRecentDayCompletions', days),
     recordDayCompletion: (completed: number, total: number) => ipcRenderer.invoke('stats:recordDayCompletion', completed, total),
     getTodayOverrides: () => ipcRenderer.invoke('stats:getTodayOverrides'),
+    getRecentSessions: (limit?: number) => ipcRenderer.invoke('stats:getRecentSessions', limit),
   },
   notes: {
     get: (date: string) => ipcRenderer.invoke('notes:get', date),

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
 import { hashPin, verifyPin } from '../utils/pin'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist' | 'daily-allowance' | 'weekly-report' | 'overlay-appearance' | 'allowed-in-focus' | 'session-history'
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -226,6 +226,31 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
     alert(`Backup saved to:\n${path}`)
   }
 
+  const handleImport = async () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,.focusflow'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const parsed = JSON.parse(text)
+        if (!parsed.settings && !parsed.tasks) { alert('Invalid backup file.'); return }
+        if (!confirm('Import this backup?\n\n• Settings will be replaced with the backup values.\n• Tasks in the backup will be merged (existing tasks kept).')) return
+        if (parsed.settings) await window.api.settings.save({ ...settings, ...parsed.settings })
+        if (parsed.tasks && Array.isArray(parsed.tasks)) {
+          const existing = new Set(state.tasks.map((t: { id: string }) => t.id))
+          for (const t of parsed.tasks) { if (!existing.has(t.id)) await window.api.tasks.insert(t) }
+        }
+        await refreshTasks()
+        alert('Backup imported successfully!')
+        window.location.reload()
+      } catch { alert('Failed to read backup file. Make sure it is a valid FocusFlow backup.') }
+    }
+    input.click()
+  }
+
   const handleClearTasks = async () => {
     if (!confirm('Delete ALL tasks? This cannot be undone.')) return
     for (const t of state.tasks) await deleteTask(t.id)
@@ -341,8 +366,10 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
           </div>
         </Section>
 
-        <Section title="Backup">
+        <Section title="Backup &amp; History">
           <BtnRow icon="📦" label="Export Backup" desc="Save all tasks & settings to a JSON file" onClick={handleExport} />
+          <BtnRow icon="📂" label="Import Backup" desc="Restore tasks & settings from a backup file" onClick={handleImport} />
+          <BtnRow icon="🕐" label="Session History" desc="Browse all completed focus sessions" onClick={() => navigate('session-history')} />
           <BtnRow icon="📋" label="View Reports" desc="Detailed focus & productivity report" onClick={() => navigate('reports')} />
         </Section>
 
