@@ -96,4 +96,6 @@ export interface AppSettings {
   weeklyReportEnabled: boolean
   aversionSoundEnabled: boolean
   tipsCardDismissed?: boolean
+  sessionPin?: string | null        // SHA-256 hex of 4–6 digit PIN; null = no PIN set
+  showBlockedSitesList?: boolean    // show domains in block overlay (default true)
 }

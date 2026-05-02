@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings, BlockedWebsite, RecurringBlockSchedule } from '../data/types'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -367,12 +367,20 @@ export default function BlockDefenseScreen({ navigate }: { navigate: (p: Page) =
                   : 'No domains added — add sites to block them 24/7'}
               </p>
             </div>
-            <button
-              onClick={() => navigate('always-on')}
-              className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors"
-            >
-              Manage →
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('import-blocklist')}
+                className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-200 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 transition-colors"
+              >
+                📥 Import
+              </button>
+              <button
+                onClick={() => navigate('always-on')}
+                className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-colors"
+              >
+                Manage →
+              </button>
+            </div>
           </div>
           {alwaysOnCount > 0 && (
             <div className="px-4 pb-3">

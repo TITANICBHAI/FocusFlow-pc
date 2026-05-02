@@ -17,6 +17,7 @@ import ChangelogScreen from './screens/ChangelogScreen'
 import HowToUseScreen from './screens/HowToUseScreen'
 import PrivacyScreen from './screens/PrivacyScreen'
 import StandaloneBlockScreen from './screens/StandaloneBlockScreen'
+import ImportBlocklistScreen from './screens/ImportBlocklistScreen'
 
 type Tab = 'today' | 'week' | 'focus' | 'stats' | 'settings'
 export type Page =
@@ -32,6 +33,7 @@ export type Page =
   | 'standalone-block'
   | 'how-to-use'
   | 'privacy'
+  | 'import-blocklist'
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = [
   { id: 'today',    label: 'Today',    icon: '📅', shortcut: '1' },
@@ -42,7 +44,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: string; shortcut: string }[] = 
 ]
 
 // Pages grouped under "block-defense" for active highlight
-const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on', 'standalone-block']
+const BLOCK_PAGES: Page[] = ['block-defense', 'keyword-blocker', 'always-on', 'standalone-block', 'import-blocklist']
 
 function TitleBar({ isFocusing }: { isFocusing: boolean }) {
   const [isMax, setIsMax] = useState(false)
@@ -263,6 +265,7 @@ function AppShell() {
           {page === 'how-to-use'      && <HowToUseScreen navigate={navigate} />}
           {page === 'privacy'          && <PrivacyScreen navigate={navigate} />}
           {page === 'standalone-block' && <StandaloneBlockScreen navigate={navigate} />}
+          {page === 'import-blocklist' && <ImportBlocklistScreen navigate={navigate} />}
         </main>
       </div>
 

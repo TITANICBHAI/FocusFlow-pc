@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
 import { formatTime, getActiveTask, isAwaitingDecision } from '../services/taskService'
+import PinModal from '../components/PinModal'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 
 // ── Web Audio beep ──────────────────────────────────────────────────────────
 function beep(type: 'work' | 'break' | 'done') {
@@ -225,6 +226,7 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
   const otherActiveCount = activeTasks.filter(t => t.id !== task?.id).length
   const [showExtend, setShowExtend] = useState(false)
   const [showPomoSettings, setShowPomoSettings] = useState(false)
+  const [showStopPin, setShowStopPin] = useState(false)
   const pomodoroEnabled = state.settings.pomodoroEnabled
   const workMins = state.settings.pomodoroDuration || 25
   const breakMins = state.settings.pomodoroBreak || 5
@@ -249,6 +251,11 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
     const upcoming = todayTasks
       .filter(t => t.status === 'scheduled' && new Date(t.startTime) > new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0]
+    const standaloneUntil = state.settings.standaloneBlockUntil ? new Date(state.settings.standaloneBlockUntil) : null
+    const standaloneActive = standaloneUntil !== null && standaloneUntil > new Date()
+    const standaloneRemaining = standaloneActive && standaloneUntil
+      ? Math.max(0, Math.round((standaloneUntil.getTime() - Date.now()) / 60000))
+      : 0
     return (
       <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 items-center justify-center p-8 text-center">
         <div className="w-20 h-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-5 text-4xl">🛡</div>
@@ -258,7 +265,17 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
         ) : (
           <p className="text-gray-500 dark:text-gray-400 text-sm">Schedule tasks on the Today tab to get started.</p>
         )}
-        <button onClick={() => navigate('today')} className="mt-5 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl text-sm transition-colors">Go to Today →</button>
+        <div className="flex gap-3 mt-5 flex-wrap justify-center">
+          <button onClick={() => navigate('today')} className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl text-sm transition-colors">Go to Today →</button>
+          <button onClick={() => navigate('standalone-block')}
+            className={`px-5 py-2.5 font-bold rounded-xl text-sm transition-colors border-2 ${
+              standaloneActive
+                ? 'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
+                : 'border-rose-400 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+            }`}>
+            {standaloneActive ? `⏱ Block Active — ${standaloneRemaining}m left` : '⏱ Standalone Block'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -343,9 +360,13 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
               🛡 {pomodoroEnabled ? 'Start Pomodoro Focus' : 'Activate Focus Mode'}
             </button>
           ) : (
-            <button onClick={() => { if (confirm('End focus mode for this task?')) stopFocusMode() }}
+            <button
+              onClick={() => {
+                if (state.settings.sessionPin) { setShowStopPin(true) }
+                else if (confirm('End focus mode for this task?')) { stopFocusMode() }
+              }}
               className="w-full py-3.5 rounded-2xl bg-gray-400 hover:bg-gray-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors">
-              ⏹ Stop Focus Mode
+              ⏹ Stop Focus Mode {state.settings.sessionPin ? '🔒' : ''}
             </button>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -421,6 +442,16 @@ export default function FocusScreen({ navigate }: { navigate: (p: Page) => void 
             <button onClick={() => setShowPomoSettings(false)} className="w-full mt-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Close</button>
           </div>
         </div>
+      )}
+
+      {showStopPin && state.settings.sessionPin && (
+        <PinModal
+          storedHash={state.settings.sessionPin}
+          title="PIN Required"
+          subtitle="Enter your session PIN to stop focus mode."
+          onSuccess={() => { stopFocusMode(); setShowStopPin(false) }}
+          onCancel={() => setShowStopPin(false)}
+        />
       )}
     </div>
   )

@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
+import { hashPin, verifyPin } from '../utils/pin'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -123,11 +124,99 @@ function KeywordModal({ settings, onSave, onClose }: { settings: AppSettings; on
   )
 }
 
+type PinMode = 'set' | 'change' | 'clear'
+
+function PinSetupModal({ mode, storedHash, onConfirm, onClose }: {
+  mode: PinMode
+  storedHash?: string | null
+  onConfirm: (newHash: string | null) => void
+  onClose: () => void
+}) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState('')
+  const [step, setStep] = useState<'verify' | 'set'>(mode === 'set' ? 'set' : 'verify')
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80) }, [step])
+
+  const handleVerify = async () => {
+    if (!storedHash) { setStep('set'); return }
+    const ok = await verifyPin(current, storedHash)
+    if (!ok) { setError('Incorrect current PIN.'); setCurrent(''); return }
+    if (mode === 'clear') { onConfirm(null); return }
+    setStep('set'); setError('')
+  }
+
+  const handleSet = async () => {
+    if (next.length < 4) { setError('PIN must be at least 4 digits.'); return }
+    if (next !== confirm) { setError("PINs don't match."); setConfirm(''); return }
+    const h = await hashPin(next)
+    onConfirm(h)
+  }
+
+  const titles: Record<PinMode, string> = { set: 'Set Session PIN', change: 'Change Session PIN', clear: 'Remove Session PIN' }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 w-80 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-1">{titles[mode]}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+          {mode === 'set' ? 'This PIN protects early-stop actions on Standalone Block and Focus sessions.' :
+           mode === 'change' ? 'Enter your current PIN, then choose a new one.' :
+           'Enter your current PIN to disable PIN protection.'}
+        </p>
+
+        {step === 'verify' && (
+          <>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Current PIN</label>
+            <input ref={inputRef} type="password" inputMode="numeric" maxLength={8} value={current}
+              onChange={e => { setCurrent(e.target.value.replace(/\D/g, '')); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleVerify()}
+              className="w-full text-center text-xl font-bold tracking-[0.4em] border-2 border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:border-indigo-500 transition-colors mb-1" />
+            {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+            <div className="flex gap-3 mt-3">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+              <button onClick={handleVerify} disabled={current.length < 4}
+                className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-colors ${mode === 'clear' ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-500 hover:bg-indigo-600'}`}>
+                {mode === 'clear' ? 'Remove PIN' : 'Next →'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'set' && (
+          <>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">New PIN (4–8 digits)</label>
+            <input ref={inputRef} type="password" inputMode="numeric" maxLength={8} value={next}
+              onChange={e => { setNext(e.target.value.replace(/\D/g, '')); setError('') }}
+              className="w-full text-center text-xl font-bold tracking-[0.4em] border-2 border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:border-indigo-500 transition-colors mb-3" />
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Confirm PIN</label>
+            <input type="password" inputMode="numeric" maxLength={8} value={confirm}
+              onChange={e => { setConfirm(e.target.value.replace(/\D/g, '')); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleSet()}
+              className="w-full text-center text-xl font-bold tracking-[0.4em] border-2 border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:border-indigo-500 transition-colors mb-1" />
+            {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+            <div className="flex gap-3 mt-3">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+              <button onClick={handleSet} disabled={next.length < 4 || confirm.length < 4}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white text-sm font-bold transition-colors">
+                Save PIN
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsScreen({ navigate }: { navigate: (p: Page) => void }) {
   const { state, updateSettings, deleteTask, refreshTasks } = useApp()
   const { settings } = state
   const [showSites, setShowSites] = useState(false)
   const [showKeywords, setShowKeywords] = useState(false)
+  const [pinMode, setPinMode] = useState<PinMode | null>(null)
 
   const update = (partial: Partial<AppSettings>) => updateSettings({ ...settings, ...partial })
 
@@ -214,6 +303,26 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
 
         <Section title="Focus Enforcement (PC)">
           <BtnRow icon="⏱" label="Standalone Block" desc="Start a timed block right now — no task needed" onClick={() => navigate('standalone-block')} />
+          <BtnRow icon="📥" label="Import Blocklist" desc="Coming from another blocker? Paste or pick domain presets" onClick={() => navigate('import-blocklist')} />
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="text-lg">🔒</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Session PIN</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {settings.sessionPin ? 'PIN set — required to stop sessions early' : 'No PIN set — sessions can be stopped freely'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {settings.sessionPin ? (
+                <>
+                  <button onClick={() => setPinMode('change')} className="px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-100 transition-colors">Change</button>
+                  <button onClick={() => setPinMode('clear')} className="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-500 text-xs font-bold hover:bg-red-100 transition-colors">Remove</button>
+                </>
+              ) : (
+                <button onClick={() => setPinMode('set')} className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold transition-colors">Set PIN</button>
+              )}
+            </div>
+          </div>
           <BtnRow icon="🛡" label="Block Enforcement" desc="Websites, keywords, schedules & deterrents" onClick={() => navigate('block-defense')} />
           <BtnRow icon="♾️" label="Always-On Block List" desc={`${settings.alwaysOnPackages?.length ?? 0} domain${(settings.alwaysOnPackages?.length ?? 0) !== 1 ? 's' : ''} blocked 24/7`} onClick={() => navigate('always-on')} />
           <BtnRow icon="🌐" label="Blocked Websites" desc={`${settings.blockedWebsites?.length ?? 0} site${(settings.blockedWebsites?.length ?? 0) !== 1 ? 's' : ''} tracked`} onClick={() => setShowSites(true)} />
@@ -244,6 +353,14 @@ export default function SettingsScreen({ navigate }: { navigate: (p: Page) => vo
 
       {showSites && <BlockedSitesModal settings={settings} onSave={updateSettings} onClose={() => setShowSites(false)} />}
       {showKeywords && <KeywordModal settings={settings} onSave={updateSettings} onClose={() => setShowKeywords(false)} />}
+      {pinMode && (
+        <PinSetupModal
+          mode={pinMode}
+          storedHash={settings.sessionPin}
+          onConfirm={(newHash) => { update({ sessionPin: newHash }); setPinMode(null) }}
+          onClose={() => setPinMode(null)}
+        />
+      )}
     </div>
   )
 }

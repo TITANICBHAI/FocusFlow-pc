@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
 import type { AppSettings } from '../data/types'
+import PinModal from '../components/PinModal'
 import dayjs from 'dayjs'
 import duration from 'dayjs/plugin/duration'
 dayjs.extend(duration)
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 
 const QUICK_DURATIONS = [
   { label: '25m', minutes: 25 },
@@ -61,6 +62,7 @@ export default function StandaloneBlockScreen({ navigate }: { navigate: (p: Page
   const [selectedMinutes, setSelectedMinutes] = useState(60)
   const [customInput, setCustomInput] = useState('')
   const [confirmStop, setConfirmStop] = useState(false)
+  const [showPin, setShowPin] = useState(false)
 
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 500)
@@ -88,10 +90,16 @@ export default function StandaloneBlockScreen({ navigate }: { navigate: (p: Page
     setCustomInput('')
   }
 
-  const stopBlock = () => {
-    if (!confirmStop) { setConfirmStop(true); setTimeout(() => setConfirmStop(false), 4000); return }
+  const doStop = () => {
     update({ standaloneBlockUntil: null })
     setConfirmStop(false)
+    setShowPin(false)
+  }
+
+  const stopBlock = () => {
+    if (settings.sessionPin) { setShowPin(true); return }
+    if (!confirmStop) { setConfirmStop(true); setTimeout(() => setConfirmStop(false), 4000); return }
+    doStop()
   }
 
   const effectiveMinutes = customInput.trim() ? (parseInt(customInput, 10) || selectedMinutes) : selectedMinutes
@@ -398,6 +406,16 @@ export default function StandaloneBlockScreen({ navigate }: { navigate: (p: Page
           </div>
         </div>
       </div>
+
+      {showPin && settings.sessionPin && (
+        <PinModal
+          storedHash={settings.sessionPin}
+          title="PIN Required"
+          subtitle="Enter your session PIN to stop this block early."
+          onSuccess={doStop}
+          onCancel={() => setShowPin(false)}
+        />
+      )}
     </div>
   )
 }

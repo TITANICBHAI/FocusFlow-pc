@@ -5,7 +5,7 @@ import { TASK_COLORS } from '../styles/theme'
 import type { Task } from '../data/types'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 type ViewMode = 'list' | 'timeline'
 type FilterStatus = 'all' | 'active' | 'scheduled' | 'completed' | 'skipped'
 

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { formatTime } from '../services/taskService'
 import dayjs from 'dayjs'
 
-type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block'
+type Page = 'today' | 'week' | 'focus' | 'stats' | 'settings' | 'profile' | 'reports' | 'active' | 'notes' | 'block-defense' | 'keyword-blocker' | 'always-on' | 'changelog' | 'how-to-use' | 'privacy' | 'standalone-block' | 'import-blocklist'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -75,7 +75,7 @@ export default function ActiveScreen({ navigate }: { navigate: (p: Page) => void
         ? `Running — ${standaloneRemaining}m remaining (ends ${standaloneUntil ? new Date(standaloneUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''})`
         : 'No timed block active',
       color: '#f43f5e',
-      action: () => navigate('standalone-block'),
+      action: () => navigate('standalone-block' | 'import-blocklist'),
       actionLabel: standaloneActive ? 'View' : 'Start',
     },
     {
