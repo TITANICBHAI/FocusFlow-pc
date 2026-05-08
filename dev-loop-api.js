@@ -154,10 +154,45 @@ async function main() {
 
   if (cmd === 'job-log') {
     const [jobId] = args
+    // Get redirect URL first, then fetch immediately without auth header (SAS URL is pre-signed)
     const logUrl = `https://api.github.com/repos/${OWNER}/${REPO}/actions/jobs/${jobId}/logs`
-    const log = await fetchLog(logUrl)
+    const redirectUrl = await new Promise((resolve, reject) => {
+      const u = new URL(logUrl)
+      const opts = {
+        hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+        headers: {
+          'Authorization': `token ${TOKEN}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'focusflow-dev-loop',
+        }
+      }
+      const req = https.request(opts, res => {
+        // Consume body to free socket
+        res.resume()
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          resolve(res.headers.location)
+        } else {
+          resolve(null)
+        }
+      })
+      req.on('error', reject)
+      req.end()
+    })
+    if (!redirectUrl) { console.log('(log not available)'); return }
+    // Fetch from SAS URL immediately — no auth header, it's a pre-signed URL
+    const log = await new Promise((resolve, reject) => {
+      const u = new URL(redirectUrl)
+      const opts = { hostname: u.hostname, path: u.pathname + u.search, method: 'GET', headers: { 'User-Agent': 'focusflow-dev-loop' } }
+      let data = ''
+      https.request(opts, res => {
+        res.on('data', c => data += c)
+        res.on('end', () => resolve(data))
+      }).on('error', reject).end()
+    })
     const lines = log.split('\n')
-    console.log(lines.slice(-200).join('\n'))
+    // Strip ANSI timestamp prefix (##[timestamp]) for readability
+    const clean = lines.map(l => l.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z /, ''))
+    console.log(clean.slice(-200).join('\n'))
     return
   }
 
