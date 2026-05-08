@@ -1,6 +1,9 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
 # FocusFlow PC — Dev Loop
+
+# Ensure nix-installed tools (curl, git, python3) are on PATH
+export PATH="/nix/store/x5hwjkyng8385q1pqhz8wyqkq0izmhpi-replit-runtime-path/bin:/home/runner/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 #
 # Usage:  bash dev-loop.sh
 #
