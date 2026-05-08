@@ -1,20 +1,67 @@
 import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut, dialog } from 'electron'
 import { join } from 'path'
+import { appendFileSync, mkdirSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import {
-  initDatabase, getAllTasks, insertTask, updateTask, deleteTask,
-  getSettings, saveSettings, startFocusSession, endFocusSession,
-  getActiveFocusSession, getTodayFocusMinutes, getStreak, getBestStreak,
-  getAllTimeFocusMinutes, getAllTimeFocusSessions, getRecentDayCompletions,
-  backfillDayCompletions, recordDayCompletion, getTodayOverrideCount,
-  logFocusOverride, getTasksInDateRange, getRecentUnresolvedTasks,
-  getNoteForDate, saveNote, getRecentNoteDates, getRecentFocusSessions
-} from './database'
 import { readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 
+// ─── Crash log (written before anything else) ────────────────────────────────
+function getLogPath(): string {
+  try {
+    return join(app.getPath('userData'), 'crash.log')
+  } catch {
+    return join(homedir(), 'focusflow-crash.log')
+  }
+}
+
+function writeLog(label: string, err: unknown): void {
+  try {
+    const logPath = getLogPath()
+    mkdirSync(join(logPath, '..'), { recursive: true })
+    const msg = `[${new Date().toISOString()}] ${label}: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`
+    appendFileSync(logPath, msg, 'utf8')
+  } catch { /* ignore log failures */ }
+}
+
+process.on('uncaughtException', (err) => {
+  writeLog('uncaughtException', err)
+  try {
+    dialog.showErrorBox(
+      'FocusFlow — Fatal Error',
+      `The app crashed unexpectedly:\n\n${err.message}\n\nA crash log has been saved to:\n${getLogPath()}`
+    )
+  } catch { /* dialog might not be available */ }
+  app.exit(1)
+})
+
+process.on('unhandledRejection', (reason) => {
+  writeLog('unhandledRejection', reason)
+})
+
+// ─── Single-instance lock ────────────────────────────────────────────────────
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+}
+
+// ─── Lazy-load database (so import errors are catchable) ─────────────────────
+let dbModule: typeof import('./database') | null = null
+
+function loadDatabase(): typeof import('./database') {
+  if (!dbModule) {
+    dbModule = require('./database') as typeof import('./database')
+  }
+  return dbModule
+}
+
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+
+function iconPath(name: string): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, name)
+    : join(__dirname, '../../build', name)
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -22,7 +69,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    show: false,
+    show: true,
     autoHideMenuBar: true,
     frame: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -34,17 +81,18 @@ function createWindow(): void {
       nodeIntegration: false,
       spellcheck: false,
     },
-    icon: join(__dirname, '../../build/icon.png')
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow!.show()
-    mainWindow!.focus()
+    icon: iconPath('icon.png')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    const msg = `Failed to load renderer: ${desc} (${code})\nURL: ${url}`
+    writeLog('did-fail-load', msg)
+    dialog.showErrorBox('FocusFlow — Load Error', `${msg}\n\nCrash log: ${getLogPath()}`)
   })
 
   mainWindow.on('close', (e) => {
@@ -62,17 +110,17 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, 'tray-icon.png')
-    : join(__dirname, '../../build/tray-icon.png')
+  const trayIcon = iconPath('tray-icon.png')
   let icon: Electron.NativeImage
   try {
-    icon = nativeImage.createFromPath(iconPath)
+    icon = nativeImage.createFromPath(trayIcon)
   } catch {
     icon = nativeImage.createEmpty()
   }
 
-  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==') : icon)
+  tray = new Tray(icon.isEmpty()
+    ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+    : icon)
 
   const buildMenu = () => Menu.buildFromTemplate([
     { label: 'Open FocusFlow', click: () => { mainWindow?.show(); mainWindow?.focus() } },
@@ -108,17 +156,26 @@ function registerGlobalShortcuts(): void {
   globalShortcut.register('CommandOrControl+Shift+4', () => showAndNavigate('stats'))
 }
 
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show()
+    mainWindow.focus()
+  }
+})
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.tbtechs.focusflow')
   app.on('browser-window-created', (_, window) => { optimizer.watchShortcuts(window) })
 
   try {
-    initDatabase()
-    backfillDayCompletions(30)
+    const db = loadDatabase()
+    db.initDatabase()
+    db.backfillDayCompletions(30)
   } catch (err) {
+    writeLog('initDatabase', err)
     dialog.showErrorBox(
-      'FocusFlow — Startup Error',
-      `Failed to initialise database:\n\n${err instanceof Error ? err.message : String(err)}\n\nThe app will now close.`
+      'FocusFlow — Database Error',
+      `Failed to open database:\n\n${err instanceof Error ? err.message : String(err)}\n\nCrash log: ${getLogPath()}\n\nThe app will now close.`
     )
     app.quit()
     return
@@ -146,47 +203,46 @@ declare global { namespace Electron { interface App { isQuiting?: boolean } } }
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('tasks:getAll', () => getAllTasks())
-ipcMain.handle('tasks:getForDate', (_, date: string) => getAllTasks().filter(t => {
+ipcMain.handle('tasks:getAll', () => loadDatabase().getAllTasks())
+ipcMain.handle('tasks:getForDate', (_, date: string) => loadDatabase().getAllTasks().filter(t => {
   const d = new Date(t.startTime); const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   const ref = new Date(date); const refDay = `${ref.getFullYear()}-${String(ref.getMonth()+1).padStart(2,'0')}-${String(ref.getDate()).padStart(2,'0')}`
   return day === refDay
 }))
-ipcMain.handle('tasks:getInRange', (_, start: string, end: string) => getTasksInDateRange(start, end))
-ipcMain.handle('tasks:getRecentUnresolved', () => getRecentUnresolvedTasks())
-ipcMain.handle('tasks:insert', (_, task) => { insertTask(task); return true })
-ipcMain.handle('tasks:update', (_, task) => { updateTask(task); return true })
-ipcMain.handle('tasks:delete', (_, id: string) => { deleteTask(id); return true })
+ipcMain.handle('tasks:getInRange', (_, start: string, end: string) => loadDatabase().getTasksInDateRange(start, end))
+ipcMain.handle('tasks:getRecentUnresolved', () => loadDatabase().getRecentUnresolvedTasks())
+ipcMain.handle('tasks:insert', (_, task) => { loadDatabase().insertTask(task); return true })
+ipcMain.handle('tasks:update', (_, task) => { loadDatabase().updateTask(task); return true })
+ipcMain.handle('tasks:delete', (_, id: string) => { loadDatabase().deleteTask(id); return true })
 
-ipcMain.handle('settings:get', () => getSettings())
-ipcMain.handle('settings:save', (_, settings) => { saveSettings(settings); return true })
+ipcMain.handle('settings:get', () => loadDatabase().getSettings())
+ipcMain.handle('settings:save', (_, settings) => { loadDatabase().saveSettings(settings); return true })
 
-ipcMain.handle('focus:start', (_, session) => { startFocusSession(session); return true })
-ipcMain.handle('focus:end', (_, taskId: string) => { endFocusSession(taskId); return true })
-ipcMain.handle('focus:getActive', () => getActiveFocusSession())
-ipcMain.handle('focus:getTodayMinutes', () => getTodayFocusMinutes())
-ipcMain.handle('focus:logOverride', (_, taskId: string, reason?: string) => { logFocusOverride(taskId, 'manual-override', reason); return true })
+ipcMain.handle('focus:start', (_, session) => { loadDatabase().startFocusSession(session); return true })
+ipcMain.handle('focus:end', (_, taskId: string) => { loadDatabase().endFocusSession(taskId); return true })
+ipcMain.handle('focus:getActive', () => loadDatabase().getActiveFocusSession())
+ipcMain.handle('focus:getTodayMinutes', () => loadDatabase().getTodayFocusMinutes())
+ipcMain.handle('focus:logOverride', (_, taskId: string, reason?: string) => { loadDatabase().logFocusOverride(taskId, 'manual-override', reason); return true })
 
-ipcMain.handle('stats:getStreak', () => getStreak())
-ipcMain.handle('stats:getBestStreak', () => getBestStreak())
-ipcMain.handle('stats:getAllTimeFocusMins', () => getAllTimeFocusMinutes())
-ipcMain.handle('stats:getAllTimeSessions', () => getAllTimeFocusSessions())
-ipcMain.handle('stats:getRecentDayCompletions', (_, days: number) => getRecentDayCompletions(days))
-ipcMain.handle('stats:recordDayCompletion', (_, completed: number, total: number) => { recordDayCompletion(completed, total); return true })
-ipcMain.handle('stats:getTodayOverrides', () => getTodayOverrideCount())
-ipcMain.handle('stats:getRecentSessions', (_, limit?: number) => getRecentFocusSessions(limit ?? 100))
+ipcMain.handle('stats:getStreak', () => loadDatabase().getStreak())
+ipcMain.handle('stats:getBestStreak', () => loadDatabase().getBestStreak())
+ipcMain.handle('stats:getAllTimeFocusMins', () => loadDatabase().getAllTimeFocusMinutes())
+ipcMain.handle('stats:getAllTimeSessions', () => loadDatabase().getAllTimeFocusSessions())
+ipcMain.handle('stats:getRecentDayCompletions', (_, days: number) => loadDatabase().getRecentDayCompletions(days))
+ipcMain.handle('stats:recordDayCompletion', (_, completed: number, total: number) => { loadDatabase().recordDayCompletion(completed, total); return true })
+ipcMain.handle('stats:getTodayOverrides', () => loadDatabase().getTodayOverrideCount())
+ipcMain.handle('stats:getRecentSessions', (_, limit?: number) => loadDatabase().getRecentFocusSessions(limit ?? 100))
 
-// ── Notes ───────────────────────────────────────────────────────────────────
-ipcMain.handle('notes:get', (_, date: string) => getNoteForDate(date))
-ipcMain.handle('notes:save', (_, date: string, content: string) => { saveNote(date, content); return true })
-ipcMain.handle('notes:getRecentDates', (_, days: number) => getRecentNoteDates(days))
+ipcMain.handle('notes:get', (_, date: string) => loadDatabase().getNoteForDate(date))
+ipcMain.handle('notes:save', (_, date: string, content: string) => { loadDatabase().saveNote(date, content); return true })
+ipcMain.handle('notes:getRecentDates', (_, days: number) => loadDatabase().getRecentNoteDates(days))
 
 ipcMain.handle('app:getVersion', () => app.getVersion())
 ipcMain.handle('app:showNotification', (_, title: string, body: string, urgency?: 'normal' | 'critical') => {
   const n = new Notification({
     title,
     body,
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: iconPath('icon.png'),
     urgency: urgency ?? 'normal',
     timeoutType: 'default',
   })
