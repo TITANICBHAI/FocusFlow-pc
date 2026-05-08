@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-20", "web", "bash"]
 
 [deployment]
 router = "application"
@@ -20,6 +20,10 @@ author = "agent"
 task = "workflow.run"
 args = "Push to GitHub"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Dev Loop"
+
 [[workflows.workflow]]
 name = "Push to GitHub"
 author = "agent"
@@ -31,8 +35,19 @@ args = "bash focusflow-pc/push-to-github.sh"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Dev Loop"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash dev-loop.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
 
 [postMerge]
@@ -46,3 +61,6 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[nix]
+channel = "stable-25_05"
