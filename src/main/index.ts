@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification, globalShortcut, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
@@ -62,7 +62,9 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  const iconPath = join(__dirname, '../../build/tray-icon.png')
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'tray-icon.png')
+    : join(__dirname, '../../build/tray-icon.png')
   let icon: Electron.NativeImage
   try {
     icon = nativeImage.createFromPath(iconPath)
@@ -110,8 +112,18 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.tbtechs.focusflow')
   app.on('browser-window-created', (_, window) => { optimizer.watchShortcuts(window) })
 
-  initDatabase()
-  backfillDayCompletions(30)
+  try {
+    initDatabase()
+    backfillDayCompletions(30)
+  } catch (err) {
+    dialog.showErrorBox(
+      'FocusFlow — Startup Error',
+      `Failed to initialise database:\n\n${err instanceof Error ? err.message : String(err)}\n\nThe app will now close.`
+    )
+    app.quit()
+    return
+  }
+
   createWindow()
   createTray()
   registerGlobalShortcuts()
