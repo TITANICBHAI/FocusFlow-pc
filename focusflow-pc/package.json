@@ -27,6 +27,7 @@
     "autoprefixer": "^10.4.17",
     "electron": "^29.0.0",
     "electron-builder": "^24.9.1",
+    "@electron/rebuild": "^3.7.1",
     "electron-vite": "^2.0.0",
     "postcss": "^8.4.33",
     "react": "^18.2.0",
@@ -43,7 +44,13 @@
     },
     "files": [
       "out/**/*",
-      "!out/**/*.map"
+      "!out/**/*.map",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
     ],
     "win": {
       "target": [
