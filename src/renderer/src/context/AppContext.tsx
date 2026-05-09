@@ -12,6 +12,7 @@ interface AppState {
   settings: AppSettings
   focusSession: FocusSession | null
   isDbReady: boolean
+  initError: string | null
 }
 
 type Action =
@@ -19,6 +20,7 @@ type Action =
   | { type: 'SET_TASKS'; payload: Task[] }
   | { type: 'SET_SETTINGS'; payload: AppSettings }
   | { type: 'SET_FOCUS_SESSION'; payload: FocusSession | null }
+  | { type: 'SET_INIT_ERROR'; payload: string }
 
 const DEFAULT_SETTINGS: AppSettings = {
   darkMode: false, defaultDuration: 60, defaultReminderOffsets: [-10, -5, 0],
@@ -28,7 +30,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   recurringBlockSchedules: [], keepFocusActiveUntilTaskEnd: false,
   blockedWebsites: [], blockedWebsitesEnabled: false, weeklyReportEnabled: false,
   aversionSoundEnabled: false, tipsCardDismissed: false,
-  // Full enforcement settings (mirroring database defaults)
   alwaysOnEnforcementEnabled: true, alwaysOnPackages: [],
   autoCopyToAlwaysOn: false, beginnerMode: false, lastShownStreakMilestone: 0,
   userProfile: undefined,
@@ -37,13 +38,15 @@ const DEFAULT_SETTINGS: AppSettings = {
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'INIT':
-      return { ...state, tasks: action.tasks, settings: action.settings, focusSession: action.focusSession, isDbReady: true }
+      return { ...state, tasks: action.tasks, settings: action.settings, focusSession: action.focusSession, isDbReady: true, initError: null }
     case 'SET_TASKS':
       return { ...state, tasks: action.payload }
     case 'SET_SETTINGS':
       return { ...state, settings: action.payload }
     case 'SET_FOCUS_SESSION':
       return { ...state, focusSession: action.payload }
+    case 'SET_INIT_ERROR':
+      return { ...state, initError: action.payload }
     default: return state
   }
 }
@@ -70,24 +73,35 @@ const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, {
-    tasks: [], settings: DEFAULT_SETTINGS, focusSession: null, isDbReady: false
+    tasks: [], settings: DEFAULT_SETTINGS, focusSession: null, isDbReady: false, initError: null
   })
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state })
 
   useEffect(() => {
-    const init = async () => {
-      const [tasks, settings, focusSession] = await Promise.all([
-        window.api.tasks.getAll(),
-        window.api.settings.get(),
-        window.api.focus.getActive(),
-      ])
-      dispatch({ type: 'INIT', tasks, settings: { ...DEFAULT_SETTINGS, ...settings }, focusSession })
-      // Apply dark mode
-      if (settings?.darkMode) document.documentElement.classList.add('dark')
-      else document.documentElement.classList.remove('dark')
+    let cancelled = false
+    const init = async (attempt = 0) => {
+      try {
+        const [tasks, settings, focusSession] = await Promise.all([
+          window.api.tasks.getAll(),
+          window.api.settings.get(),
+          window.api.focus.getActive(),
+        ])
+        if (cancelled) return
+        dispatch({ type: 'INIT', tasks, settings: { ...DEFAULT_SETTINGS, ...settings }, focusSession })
+        if (settings?.darkMode) document.documentElement.classList.add('dark')
+        else document.documentElement.classList.remove('dark')
+      } catch (err) {
+        if (cancelled) return
+        if (attempt < 4) {
+          setTimeout(() => init(attempt + 1), 1000 * (attempt + 1))
+        } else {
+          dispatch({ type: 'SET_INIT_ERROR', payload: String(err) })
+        }
+      }
     }
     init()
+    return () => { cancelled = true }
   }, [])
 
   // Persist dark mode class whenever setting changes
@@ -100,116 +114,137 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!state.isDbReady) return
     const tick = setInterval(async () => {
-      const tasks = await window.api.tasks.getAll()
-      dispatch({ type: 'SET_TASKS', payload: tasks })
-      const today = getTodayTasks(tasks)
-      const done = today.filter(t => t.status === 'completed').length
-      if (today.length > 0) await window.api.stats.recordDayCompletion(done, today.length)
+      try {
+        const tasks = await window.api.tasks.getAll()
+        dispatch({ type: 'SET_TASKS', payload: tasks })
+        const today = getTodayTasks(tasks)
+        const done = today.filter(t => t.status === 'completed').length
+        if (today.length > 0) await window.api.stats.recordDayCompletion(done, today.length)
+      } catch {
+        // silent — next tick will retry
+      }
     }, 60000)
     return () => clearInterval(tick)
   }, [state.isDbReady])
 
   const refreshTasks = useCallback(async () => {
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
+    try {
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+    } catch { /* silent */ }
   }, [])
 
   const addTask = useCallback(async (data: Parameters<typeof createTask>[0]) => {
-    const task = createTask(data)
-    await window.api.tasks.insert(task)
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
-    // Schedule reminder notification
-    if (stateRef.current.settings.notificationsEnabled && task.startTime) {
-      const msUntil = new Date(task.startTime).getTime() - Date.now() - 5 * 60 * 1000
-      if (msUntil > 0) {
-        setTimeout(() => {
-          window.api.app.showNotification('Task Starting Soon', `"${task.title}" starts in 5 minutes`)
-        }, msUntil)
+    try {
+      const task = createTask(data)
+      await window.api.tasks.insert(task)
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+      if (stateRef.current.settings.notificationsEnabled && task.startTime) {
+        const msUntil = new Date(task.startTime).getTime() - Date.now() - 5 * 60 * 1000
+        if (msUntil > 0) {
+          setTimeout(() => {
+            window.api.app.showNotification('Task Starting Soon', `"${task.title}" starts in 5 minutes`)
+          }, msUntil)
+        }
       }
-    }
+    } catch (e) { console.error('addTask failed:', e) }
   }, [])
 
   const updateTask = useCallback(async (task: Task) => {
-    const updated = { ...task, updatedAt: new Date().toISOString() }
-    await window.api.tasks.update(updated)
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
+    try {
+      const updated = { ...task, updatedAt: new Date().toISOString() }
+      await window.api.tasks.update(updated)
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+    } catch (e) { console.error('updateTask failed:', e) }
   }, [])
 
   const deleteTask = useCallback(async (id: string) => {
-    await window.api.tasks.delete(id)
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
+    try {
+      await window.api.tasks.delete(id)
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+    } catch (e) { console.error('deleteTask failed:', e) }
   }, [])
 
   const completeTask = useCallback(async (id: string) => {
-    const task = stateRef.current.tasks.find(t => t.id === id)
-    if (!task) return
-    const updated = updateTaskStatus(task, 'completed')
-    await window.api.tasks.update(updated)
-    // If this task was in focus session, end it
-    if (stateRef.current.focusSession?.taskId === id && !stateRef.current.settings.keepFocusActiveUntilTaskEnd) {
-      await window.api.focus.end(id)
-      dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
-    }
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
-    const todayTasks = getTodayTasks(tasks)
-    const done = todayTasks.filter(t => t.status === 'completed').length
-    if (todayTasks.length > 0) await window.api.stats.recordDayCompletion(done, todayTasks.length)
-    if (stateRef.current.settings.notificationsEnabled) {
-      window.api.app.showNotification('Task Completed! 🎉', `"${task.title}" is done.`)
-    }
+    try {
+      const task = stateRef.current.tasks.find(t => t.id === id)
+      if (!task) return
+      const updated = updateTaskStatus(task, 'completed')
+      await window.api.tasks.update(updated)
+      if (stateRef.current.focusSession?.taskId === id && !stateRef.current.settings.keepFocusActiveUntilTaskEnd) {
+        await window.api.focus.end(id)
+        dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
+      }
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+      const todayTasks = getTodayTasks(tasks)
+      const done = todayTasks.filter(t => t.status === 'completed').length
+      if (todayTasks.length > 0) await window.api.stats.recordDayCompletion(done, todayTasks.length)
+      if (stateRef.current.settings.notificationsEnabled) {
+        window.api.app.showNotification('Task Completed! 🎉', `"${task.title}" is done.`)
+      }
+    } catch (e) { console.error('completeTask failed:', e) }
   }, [])
 
   const skipTask = useCallback(async (id: string) => {
-    const task = stateRef.current.tasks.find(t => t.id === id)
-    if (!task) return
-    const updated = updateTaskStatus(task, 'skipped')
-    await window.api.tasks.update(updated)
-    if (stateRef.current.focusSession?.taskId === id) {
-      await window.api.focus.end(id)
-      dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
-    }
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
+    try {
+      const task = stateRef.current.tasks.find(t => t.id === id)
+      if (!task) return
+      const updated = updateTaskStatus(task, 'skipped')
+      await window.api.tasks.update(updated)
+      if (stateRef.current.focusSession?.taskId === id) {
+        await window.api.focus.end(id)
+        dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
+      }
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+    } catch (e) { console.error('skipTask failed:', e) }
   }, [])
 
   const extendTaskTime = useCallback(async (id: string, minutes: number) => {
-    const task = stateRef.current.tasks.find(t => t.id === id)
-    if (!task) return
-    const extended = extendTask(task, minutes)
-    await window.api.tasks.update(extended)
-    const tasks = await window.api.tasks.getAll()
-    dispatch({ type: 'SET_TASKS', payload: tasks })
+    try {
+      const task = stateRef.current.tasks.find(t => t.id === id)
+      if (!task) return
+      const extended = extendTask(task, minutes)
+      await window.api.tasks.update(extended)
+      const tasks = await window.api.tasks.getAll()
+      dispatch({ type: 'SET_TASKS', payload: tasks })
+    } catch (e) { console.error('extendTaskTime failed:', e) }
   }, [])
 
   const startFocusMode = useCallback(async (taskId: string) => {
-    const task = stateRef.current.tasks.find(t => t.id === taskId)
-    if (!task) return
-    // End any existing session
-    if (stateRef.current.focusSession) {
-      await window.api.focus.end(stateRef.current.focusSession.taskId)
-    }
-    const session: FocusSession = { taskId, startedAt: new Date().toISOString(), isActive: true, allowedPackages: [] }
-    await window.api.focus.start(session)
-    dispatch({ type: 'SET_FOCUS_SESSION', payload: session })
-    if (stateRef.current.settings.notificationsEnabled) {
-      window.api.app.showNotification('Focus Mode Active 🛡', `Focusing on "${task.title}"`)
-    }
+    try {
+      const task = stateRef.current.tasks.find(t => t.id === taskId)
+      if (!task) return
+      if (stateRef.current.focusSession) {
+        await window.api.focus.end(stateRef.current.focusSession.taskId)
+      }
+      const session: FocusSession = { taskId, startedAt: new Date().toISOString(), isActive: true, allowedPackages: [] }
+      await window.api.focus.start(session)
+      dispatch({ type: 'SET_FOCUS_SESSION', payload: session })
+      if (stateRef.current.settings.notificationsEnabled) {
+        window.api.app.showNotification('Focus Mode Active 🛡', `Focusing on "${task.title}"`)
+      }
+    } catch (e) { console.error('startFocusMode failed:', e) }
   }, [])
 
   const stopFocusMode = useCallback(async () => {
-    if (stateRef.current.focusSession) {
-      await window.api.focus.end(stateRef.current.focusSession.taskId)
-    }
-    dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
+    try {
+      if (stateRef.current.focusSession) {
+        await window.api.focus.end(stateRef.current.focusSession.taskId)
+      }
+      dispatch({ type: 'SET_FOCUS_SESSION', payload: null })
+    } catch (e) { console.error('stopFocusMode failed:', e) }
   }, [])
 
   const updateSettings = useCallback(async (settings: AppSettings) => {
-    dispatch({ type: 'SET_SETTINGS', payload: settings })
-    await window.api.settings.save(settings)
+    try {
+      dispatch({ type: 'SET_SETTINGS', payload: settings })
+      await window.api.settings.save(settings)
+    } catch (e) { console.error('updateSettings failed:', e) }
   }, [])
 
   const todayTasks = getTodayTasks(state.tasks)
