@@ -18,33 +18,19 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Push to GitHub"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Dev Loop"
+args = "Start application"
 
 [[workflows.workflow]]
-name = "Push to GitHub"
+name = "Start application"
 author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash focusflow-pc/push-to-github.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Dev Loop"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash dev-loop.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
+args = "bash start.sh"
+waitForPort = 5000
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -55,11 +41,11 @@ path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
+localPort = 3001
+externalPort = 3001
 
 [[ports]]
-localPort = 8081
+localPort = 5000
 externalPort = 80
 
 [nix]
