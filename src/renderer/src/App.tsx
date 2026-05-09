@@ -171,8 +171,24 @@ function AppShell() {
         <TitleBar isFocusing={false} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400 font-medium">Loading FocusFlow…</p>
+            {state.initError ? (
+              <>
+                <div className="text-4xl mb-4">⚠️</div>
+                <p className="text-gray-800 dark:text-gray-100 font-semibold mb-2">Failed to connect</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs">{state.initError}</p>
+                <button
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 font-medium">Loading FocusFlow…</p>
+              </>
+            )}
           </div>
         </div>
       </div>
