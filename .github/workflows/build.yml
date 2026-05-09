@@ -1,4 +1,7 @@
 name: Build FocusFlow PC
+# NOTE: This workflow assumes the Electron app files (package.json, src/, build/, electron.vite.config.ts)
+# are at the ROOT of the GitHub repository (TITANICBHAI/FocusFlow-pc), not in a subdirectory.
+# electron-builder outputs to dist/ at repo root (configured in package.json "directories.output").
 
 on:
   push:
