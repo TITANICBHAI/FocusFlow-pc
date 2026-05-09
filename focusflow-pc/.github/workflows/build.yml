@@ -11,6 +11,9 @@ jobs:
   build-windows:
     name: Build Windows Installer (.exe)
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: focusflow-pc
 
     steps:
       - name: Checkout
@@ -20,9 +23,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: focusflow-pc/package-lock.json
 
       - name: Install dependencies
         run: npm install
+
+      - name: Rebuild native modules for Electron
+        run: npx @electron/rebuild -f -w better-sqlite3
+        env:
+          npm_config_msvs_version: '2022'
 
       - name: Build Electron app
         run: npm run build
@@ -40,8 +50,8 @@ jobs:
         with:
           name: FocusFlow-Windows-${{ github.sha }}
           path: |
-            dist/*.exe
-            dist/*-setup.exe
+            focusflow-pc/dist/*.exe
+            focusflow-pc/dist/*-setup.exe
           retention-days: 30
           if-no-files-found: warn
 
@@ -52,6 +62,9 @@ jobs:
     needs: build-windows
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: focusflow-pc
 
     steps:
       - name: Checkout
@@ -61,9 +74,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: focusflow-pc/package-lock.json
 
       - name: Install dependencies
         run: npm install
+
+      - name: Rebuild native modules for Electron
+        run: npx @electron/rebuild -f -w better-sqlite3
+        env:
+          npm_config_msvs_version: '2022'
 
       - name: Build & Package for release
         run: npm run package:win
@@ -102,8 +122,8 @@ jobs:
             | `Ctrl+Shift+3` | Stats |
             | `Ctrl+Shift+4` | Settings |
           files: |
-            dist/*.exe
-            dist/*.yml
+            focusflow-pc/dist/*.exe
+            focusflow-pc/dist/*.yml
           draft: false
           prerelease: false
           generate_release_notes: true
